@@ -40,9 +40,11 @@ class MessageService:
         """
         try:
             # Validar datos de entrada
-            phone_number = message_data.get('phone_number')
-            content = message_data.get('content')
+            phone_number = message_data.get('to')
+            content = message_data.get('text')
             line_id = message_data.get('line_id')
+
+            print('hola')
             
             if not validate_phone_number(phone_number):
                 raise ValidationError("Formato de número de teléfono inválido")

@@ -19,17 +19,26 @@ def validate_phone_number(phone: str) -> bool:
     Returns:
         bool: True si el formato es válido
     """
+    print(f"DEBUG: Validando número: '{phone}' (tipo: {type(phone)})")
+
     if not phone or not isinstance(phone, str):
+        print(f"DEBUG: Falló validación inicial - phone: {phone}, tipo: {type(phone)}")
         return False
     
     # Limpiar espacios y caracteres especiales comunes
     cleaned_phone = re.sub(r'[\s\-\(\)]', '', phone.strip())
+    print(f"DEBUG: Número limpio: '{cleaned_phone}'")
     
-    # Validar con regex E.164
-    is_valid = bool(PHONE_REGEX.match(cleaned_phone))
+    # Validar con regex E.164 (más flexible)
+    # Permitir números de 7 a 15 dígitos, con o sin +
+    flexible_regex = re.compile(r'^\+?[1-9]\d{6,14}$')
+    is_valid = bool(flexible_regex.match(cleaned_phone))
+    
+    print(f"DEBUG: Validación resultado: {is_valid}")
     
     if not is_valid:
         logging.debug(f"Número de teléfono inválido: {phone}")
+        print(f"DEBUG: Regex falló para: '{cleaned_phone}'")
     
     return is_valid
 
