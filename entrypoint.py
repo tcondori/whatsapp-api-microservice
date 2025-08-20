@@ -144,56 +144,22 @@ def _register_api_namespaces(api: Api):
     Args:
         api: Instancia de Flask-RESTX Api
     """
-    # Importar namespace real de mensajes
-    from app.api.messages import messages_ns
+    # Importar todos los namespaces
+    from app.api.messages.routes import messages_ns
+    from app.api.contacts.routes import contacts_ns
+    from app.api.media.routes import media_ns
+    from app.api.webhooks.routes import webhook_ns
     
-    # Registrar namespace de mensajes
+    # Registrar namespaces con sus rutas
     api.add_namespace(messages_ns, path='/v1/messages')
-    
-    # Namespace temporal para contactos (placeholder)
-    from flask_restx import Namespace, Resource
-    contacts_ns = Namespace('contacts', description='Gestión de contactos de WhatsApp')
-    
-    @contacts_ns.route('/health')
-    class ContactsHealth(Resource):
-        def get(self):
-            """Health check para módulo de contactos"""
-            return {'status': 'healthy', 'module': 'contacts'}
-    
-    # Namespace para contactos
-    contacts_ns = Namespace('contacts', description='Gestión de contactos de WhatsApp')
-    
-    @contacts_ns.route('/health')
-    class ContactsHealth(Resource):
-        def get(self):
-            """Health check para módulo de contactos"""
-            return {'status': 'healthy', 'module': 'contacts'}
-    
-    # Namespace para medios
-    media_ns = Namespace('media', description='Gestión de archivos multimedia')
-    
-    @media_ns.route('/health')
-    class MediaHealth(Resource):
-        def get(self):
-            """Health check para módulo de medios"""
-            return {'status': 'healthy', 'module': 'media'}
-    
-    # Namespace para webhooks
-    webhooks_ns = Namespace('webhooks', description='Procesamiento de webhooks de WhatsApp')
-    
-    @webhooks_ns.route('/health')
-    class WebhooksHealth(Resource):
-        def get(self):
-            """Health check para módulo de webhooks"""
-            return {'status': 'healthy', 'module': 'webhooks'}
-    
-    # Registrar namespaces con rutas
-    api.add_namespace(messages_ns, path='/api/v1/messages')
-    api.add_namespace(contacts_ns, path='/api/v1/contacts')
-    api.add_namespace(media_ns, path='/api/v1/media')
-    api.add_namespace(webhooks_ns, path='/api/v1/webhooks')
+    api.add_namespace(contacts_ns, path='/v1/contacts')
+    api.add_namespace(media_ns, path='/v1/media')
+    api.add_namespace(webhook_ns, path='/v1/webhooks')
     
     # Health check general (sin autenticación para testing)
+    from flask_restx import Resource
+    from flask import current_app
+    
     @api.route('/health')
     class GeneralHealth(Resource):
         def get(self):
@@ -204,7 +170,7 @@ def _register_api_namespaces(api: Api):
                 'status': 'healthy',
                 'service': 'WhatsApp API Microservice',
                 'version': '1.0.0',
-                'environment': app.config.get('FLASK_ENV', 'development'),
+                'environment': current_app.config.get('FLASK_ENV', 'development'),
                 'database': 'connected',
                 'redis': 'connected' if is_redis_available() else 'disconnected',
                 'components': {

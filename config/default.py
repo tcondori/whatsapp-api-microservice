@@ -15,6 +15,13 @@ class DefaultConfig:
     WHATSAPP_BUSINESS_ID = os.getenv('WHATSAPP_BUSINESS_ID')
     WHATSAPP_API_BASE_URL = 'https://graph.facebook.com'
     
+    # Configuración de líneas individuales (para compatibilidad)
+    LINE_1_PHONE_NUMBER_ID = os.getenv('LINE_1_PHONE_NUMBER_ID')
+    LINE_1_DISPLAY_NAME = os.getenv('LINE_1_DISPLAY_NAME', 'Línea Principal')
+    LINE_1_PHONE_NUMBER = os.getenv('LINE_1_PHONE_NUMBER')
+    LINE_1_IS_ACTIVE = os.getenv('LINE_1_IS_ACTIVE', 'true').lower() == 'true'
+    LINE_1_MAX_DAILY_MESSAGES = int(os.getenv('LINE_1_MAX_DAILY_MESSAGES', '1000'))
+    
     # Configuración de soporte multi-línea
     # Líneas de mensajería soportadas (JSON string)
     MESSAGING_LINES = os.getenv('MESSAGING_LINES', '[]')

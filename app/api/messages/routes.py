@@ -17,21 +17,21 @@ from app.api.messages.models import (
 )
 
 # Crear namespace para mensajes
-api = Namespace(
+messages_ns = Namespace(
     'messages',
     description='Operaciones de mensajes de WhatsApp',
     path='/messages'
 )
 
 # Definir modelos usando el namespace
-text_message_request = api.model('TextMessageRequest', TEXT_MESSAGE_FIELDS)
-message_response = api.model('MessageResponse', MESSAGE_RESPONSE_FIELDS)
-update_status_request = api.model('UpdateMessageStatusRequest', UPDATE_STATUS_FIELDS)
-error_response = api.model('ErrorResponse', ERROR_RESPONSE_FIELDS)
-health_response = api.model('HealthResponse', HEALTH_RESPONSE_FIELDS)
+text_message_request = messages_ns.model('TextMessageRequest', TEXT_MESSAGE_FIELDS)
+message_response = messages_ns.model('MessageResponse', MESSAGE_RESPONSE_FIELDS)
+update_status_request = messages_ns.model('UpdateMessageStatusRequest', UPDATE_STATUS_FIELDS)
+error_response = messages_ns.model('ErrorResponse', ERROR_RESPONSE_FIELDS)
+health_response = messages_ns.model('HealthResponse', HEALTH_RESPONSE_FIELDS)
 
 # Modelo simple para lista de mensajes (sin referencias complejas)
-message_list_response = api.model('MessageListResponse', {
+message_list_response = messages_ns.model('MessageListResponse', {
     'success': fields.Boolean(
         required=True,
         description='Indica si la operación fue exitosa',
@@ -51,18 +51,18 @@ message_list_response = api.model('MessageListResponse', {
 # Inicializar servicio
 message_service = MessageService()
 
-@api.route('/text')
+@messages_ns.route('/text')
 class TextMessageResource(Resource):
     """
     Endpoint para envío de mensajes de texto
     """
     
-    @api.doc('send_text_message', security='ApiKeyAuth')
-    @api.expect(text_message_request, validate=True)
-    @api.response(200, 'Mensaje enviado exitosamente', message_response)
-    @api.response(400, 'Error de validación', error_response)
-    @api.response(401, 'No autorizado')
-    @api.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc('send_text_message', security='ApiKeyAuth')
+    @messages_ns.expect(text_message_request, validate=True)
+    @messages_ns.response(200, 'Mensaje enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
     @require_api_key
     def post(self):
         """
@@ -94,35 +94,35 @@ class TextMessageResource(Resource):
                 error_code="VALIDATION_ERROR"
             )
         except (MessageSendError, LineNotFoundError) as e:
-            api.abort(400,
+            messages_ns.abort(400,
                 message=str(e),
                 error_code="MESSAGE_SEND_ERROR"
             )
         except Exception as e:
-            api.abort(500,
+            messages_ns.abort(500,
                 message="Error interno del servidor",
                 error_code="INTERNAL_ERROR",
                 details=str(e)
             )
 
-@api.route('')
+@messages_ns.route('')
 class MessageListResource(Resource):
     """
     Endpoint para listar mensajes con filtros
     """
     
-    @api.doc('get_messages', security='ApiKeyAuth')
-    @api.param('page', 'Número de página', type='integer', default=1)
-    @api.param('per_page', 'Elementos por página', type='integer', default=10)
-    @api.param('phone_number', 'Filtrar por número de teléfono')
-    @api.param('status', 'Filtrar por estado', enum=['pending', 'sent', 'delivered', 'read', 'failed'])
-    @api.param('message_type', 'Filtrar por tipo', enum=['text', 'image', 'document', 'audio', 'video'])
-    @api.param('direction', 'Filtrar por dirección', enum=['inbound', 'outbound'])
-    @api.param('line_id', 'Filtrar por línea de mensajería')
-    @api.response(200, 'Lista de mensajes obtenida exitosamente', message_list_response)
-    @api.response(400, 'Error de validación', error_response)
-    @api.response(401, 'No autorizado')
-    @api.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc('get_messages', security='ApiKeyAuth')
+    @messages_ns.param('page', 'Número de página', type='integer', default=1)
+    @messages_ns.param('per_page', 'Elementos por página', type='integer', default=10)
+    @messages_ns.param('phone_number', 'Filtrar por número de teléfono')
+    @messages_ns.param('status', 'Filtrar por estado', enum=['pending', 'sent', 'delivered', 'read', 'failed'])
+    @messages_ns.param('message_type', 'Filtrar por tipo', enum=['text', 'image', 'document', 'audio', 'video'])
+    @messages_ns.param('direction', 'Filtrar por dirección', enum=['inbound', 'outbound'])
+    @messages_ns.param('line_id', 'Filtrar por línea de mensajería')
+    @messages_ns.response(200, 'Lista de mensajes obtenida exitosamente', message_list_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
     @require_api_key
     def get(self):
         """
@@ -170,19 +170,19 @@ class MessageListResource(Resource):
                 details=str(e)
             )
 
-@api.route('/<string:message_id>')
+@messages_ns.route('/<string:message_id>')
 class MessageResource(Resource):
     """
     Endpoint para operaciones con mensajes específicos
     """
     
-    @api.doc('get_message_by_id', security='ApiKeyAuth')
-    @api.param('message_id', 'ID del mensaje')
-    @api.response(200, 'Mensaje encontrado exitosamente', message_response)
-    @api.response(400, 'Error de validación', error_response)
-    @api.response(401, 'No autorizado')
-    @api.response(404, 'Mensaje no encontrado', error_response)
-    @api.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc('get_message_by_id', security='ApiKeyAuth')
+    @messages_ns.param('message_id', 'ID del mensaje')
+    @messages_ns.response(200, 'Mensaje encontrado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(404, 'Mensaje no encontrado', error_response)
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
     @require_api_key
     def get(self, message_id):
         """
@@ -220,18 +220,18 @@ class MessageResource(Resource):
                 details=str(e)
             ), 500
 
-@api.route('/whatsapp/<string:whatsapp_message_id>')
+@messages_ns.route('/whatsapp/<string:whatsapp_message_id>')
 class WhatsAppMessageResource(Resource):
     """
     Endpoint para operaciones con mensajes por ID de WhatsApp
     """
     
-    @api.doc('get_message_by_whatsapp_id', security='ApiKeyAuth')
-    @api.param('whatsapp_message_id', 'ID del mensaje en WhatsApp')
-    @api.response(200, 'Mensaje encontrado exitosamente', message_response)
-    @api.response(401, 'No autorizado')
-    @api.response(404, 'Mensaje no encontrado', error_response)
-    @api.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc('get_message_by_whatsapp_id', security='ApiKeyAuth')
+    @messages_ns.param('whatsapp_message_id', 'ID del mensaje en WhatsApp')
+    @messages_ns.response(200, 'Mensaje encontrado exitosamente', message_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(404, 'Mensaje no encontrado', error_response)
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
     @require_api_key
     def get(self, whatsapp_message_id):
         """
@@ -264,20 +264,20 @@ class WhatsAppMessageResource(Resource):
                 details=str(e)
             ), 500
 
-@api.route('/whatsapp/<string:whatsapp_message_id>/status')
+@messages_ns.route('/whatsapp/<string:whatsapp_message_id>/status')
 class MessageStatusResource(Resource):
     """
     Endpoint para actualización de estado de mensajes
     """
     
-    @api.doc('update_message_status', security='ApiKeyAuth')
-    @api.param('whatsapp_message_id', 'ID del mensaje en WhatsApp')
-    @api.expect(update_status_request, validate=True)
-    @api.response(200, 'Estado actualizado exitosamente')
-    @api.response(400, 'Error de validación', error_response)
-    @api.response(401, 'No autorizado')
-    @api.response(404, 'Mensaje no encontrado', error_response)
-    @api.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc('update_message_status', security='ApiKeyAuth')
+    @messages_ns.param('whatsapp_message_id', 'ID del mensaje en WhatsApp')
+    @messages_ns.expect(update_status_request, validate=True)
+    @messages_ns.response(200, 'Estado actualizado exitosamente')
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(404, 'Mensaje no encontrado', error_response)
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
     @require_api_key
     def patch(self, whatsapp_message_id):
         """
@@ -329,15 +329,15 @@ class MessageStatusResource(Resource):
             ), 500
 
 # Endpoint de prueba simple para verificar funcionalidad
-@api.route('/test')
+@messages_ns.route('/test')
 class MessageTestResource(Resource):
     """
     Endpoint de prueba para verificar funcionalidad básica
     """
     
-    @api.doc('test_messages_api', security='ApiKeyAuth')
-    @api.response(200, 'API de mensajes funcionando correctamente')
-    @api.response(401, 'No autorizado')
+    @messages_ns.doc('test_messages_api', security='ApiKeyAuth')
+    @messages_ns.response(200, 'API de mensajes funcionando correctamente')
+    @messages_ns.response(401, 'No autorizado')
     @require_api_key
     def get(self):
         """

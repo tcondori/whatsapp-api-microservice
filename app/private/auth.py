@@ -133,6 +133,9 @@ def require_webhook_signature(f):
     
     return decorated_function
 
+# Alias para mantener compatibilidad
+require_webhook_verification = require_webhook_signature
+
 def extract_line_id_from_webhook(webhook_data: dict) -> str:
     """
     Extrae el ID de línea desde los datos del webhook

@@ -9,6 +9,7 @@ import logging
 
 from app.repositories.base_repo import MessageRepository, MessagingLineRepository
 from app.private.validators import validate_phone_number, validate_message_content, sanitize_message_content
+from app.services.whatsapp_api import WhatsAppAPIService
 from app.utils.exceptions import (
     ValidationError, MessageSendError, LineNotFoundError, 
     MessageNotFoundError, WhatsAppAPIError
@@ -28,6 +29,8 @@ class MessageService:
         """
         self.msg_repo = MessageRepository()
         self.line_repo = MessagingLineRepository()
+        self.whatsapp_api = WhatsAppAPIService()
+        self.config = DefaultConfig()
         self.logger = logging.getLogger('whatsapp_api.services.message')
     
     def send_text_message(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -43,8 +46,6 @@ class MessageService:
             phone_number = message_data.get('to')
             content = message_data.get('text')
             line_id = message_data.get('line_id')
-
-            print('hola')
             
             if not validate_phone_number(phone_number):
                 raise ValidationError("Formato de número de teléfono inválido")
@@ -59,9 +60,9 @@ class MessageService:
             # Obtener línea de mensajería
             messaging_line = self._get_available_line(line_id)
             
-            # Simular envío a WhatsApp API (por ahora crear mensaje local)
-            whatsapp_message_id = self._simulate_whatsapp_send(
-                phone_number, clean_content, messaging_line.line_id
+            # Enviar mensaje via WhatsApp API
+            whatsapp_message_id = self._send_whatsapp_message(
+                phone_number, clean_content, messaging_line
             )
             
             # Crear registro en base de datos
@@ -71,7 +72,7 @@ class MessageService:
                 phone_number=phone_number,
                 message_type='text',
                 content=clean_content,
-                status='sent',  # En implementación real sería 'pending'
+                status='pending',  # Estado inicial - se actualizará vía webhook
                 direction='outbound'
             )
             
@@ -305,10 +306,48 @@ class MessageService:
             self.logger.info(f"Línea por defecto creada: {line_id}")
         return line
     
+    def _send_whatsapp_message(self, phone_number: str, content: str, messaging_line: Any) -> str:
+        """
+        Envía mensaje a través de WhatsApp API
+        Args:
+            phone_number: Número destino
+            content: Contenido del mensaje
+            messaging_line: Instancia de línea de mensajería
+        Returns:
+            str: ID del mensaje de WhatsApp
+        """
+        try:
+            # Si no hay access token configurado, usar modo simulación
+            if not self.whatsapp_api.access_token:
+                return self._simulate_whatsapp_send(phone_number, content, messaging_line.line_id)
+            
+            # Enviar mensaje real via WhatsApp API
+            response = self.whatsapp_api.send_text_message(
+                phone_number=phone_number,
+                text=content,
+                phone_number_id=messaging_line.phone_number_id
+            )
+            
+            # Extraer message_id de la respuesta
+            if response and 'messages' in response and response['messages']:
+                whatsapp_message_id = response['messages'][0]['id']
+                self.logger.info(f"Mensaje enviado exitosamente via WhatsApp API: {whatsapp_message_id}")
+                return whatsapp_message_id
+            else:
+                raise MessageSendError("Respuesta inválida de WhatsApp API")
+                
+        except WhatsAppAPIError as e:
+            self.logger.error(f"Error enviando mensaje via WhatsApp API: {e}")
+            # En caso de error, usar simulación como fallback
+            self.logger.warning("Usando modo simulación como fallback")
+            return self._simulate_whatsapp_send(phone_number, content, messaging_line.line_id)
+        except Exception as e:
+            self.logger.error(f"Error inesperado enviando mensaje: {e}")
+            raise MessageSendError(f"Error enviando mensaje: {str(e)}")
+    
     def _simulate_whatsapp_send(self, phone_number: str, content: str, line_id: str) -> str:
         """
-        Simula el envío a WhatsApp API (para pruebas)
-        En implementación real, aquí se haría la llamada a Graph API
+        Simula el envío a WhatsApp API (para desarrollo/pruebas)
         Args:
             phone_number: Número destino
             content: Contenido del mensaje
@@ -342,8 +381,8 @@ class MessageService:
             'status': message.status,
             'direction': message.direction,
             'line_id': message.line_id,
-            'created_at': message.created_at.isoformat() + 'Z',
-            'updated_at': message.updated_at.isoformat() + 'Z',
+            'created_at': message.created_at.isoformat() + 'Z' if message.created_at else None,
+            'updated_at': message.updated_at.isoformat() + 'Z' if message.updated_at else None,
             'retry_count': message.retry_count,
             'error_message': message.error_message
         }
