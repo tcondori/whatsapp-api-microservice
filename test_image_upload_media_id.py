@@ -79,7 +79,7 @@ def test_image_upload_media_id():
         'to': PHONE_NUMBER,
         'type': 'image',
         'caption': '🖼️ Imagen enviada con CASO 2: Upload + Media ID\n\nFlujo oficial Meta:\n1. Upload de archivo\n2. Obtención de media_id\n3. Envío con media_id',
-        'messaging_line_id': 'line_1'  # Usar line_1 que sabemos existe
+        'messaging_line_id': 1  # Usar 1 que es nuestro line_id entero
     }
     
     # Preparar archivo
@@ -153,9 +153,15 @@ def test_image_upload_media_id():
         return False
 
 def verify_api_availability():
-    """Verifica que la API esté disponible"""
+    """
+    Verifica que la API esté disponible realizando una petición GET al endpoint de test.
+    Returns:
+        bool: True si la API responde con status 200 (disponible), False en caso contrario o si ocurre un error.
+    """
     try:
-        response = requests.get(f"{BASE_URL}/v1/health", timeout=5)
+        # Usar endpoint de test de messages que sabemos que existe
+        headers = {'X-API-Key': API_KEY}
+        response = requests.get(f"{BASE_URL}/v1/messages/test", headers=headers, timeout=5)
         if response.status_code == 200:
             print("✅ API disponible")
             return True
