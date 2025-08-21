@@ -292,15 +292,21 @@ class MessagingLineRepository(BaseRepository):
         from database.models import MessagingLine
         super().__init__(MessagingLine)
     
-    def get_by_line_id(self, line_id: str) -> Optional[Any]:
+    def get_by_line_id(self, line_id) -> Optional[Any]:
         """
         Obtiene línea por ID
         Args:
-            line_id: ID de la línea
+            line_id: ID de la línea (int o str que se puede convertir a int)
         Returns:
             Línea encontrada o None
         """
         try:
+            # Convertir a int si viene como string
+            if isinstance(line_id, str):
+                line_id = int(line_id)
+            elif not isinstance(line_id, int):
+                line_id = int(line_id)
+            
             result = self.model_class.query.filter_by(line_id=line_id).first()
             if result:
                 self.logger.debug(f"Encontrada línea: {line_id}")

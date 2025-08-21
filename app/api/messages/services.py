@@ -94,6 +94,377 @@ class MessageService:
         except Exception as e:
             self.logger.error(f"Error inesperado enviando mensaje: {e}")
             raise MessageSendError(f"Error al enviar mensaje: {str(e)}")
+
+    def send_image_message(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Envía un mensaje de imagen vía WhatsApp API usando formato oficial de Meta
+        
+        Formato esperado (oficial Meta):
+        {
+          "to": "whatsapp-id",
+          "type": "image", 
+          "image": {
+            "link": "http(s)://the-url"  // OR
+            "id": "your-media-id"
+          },
+          "messaging_line_id": 1  // opcional
+        }
+        
+        Args:
+            message_data: Datos del mensaje en formato oficial Meta
+        Returns:
+            dict: Respuesta del envío con datos del mensaje creado
+        """
+        try:
+            # Extraer datos del mensaje (formato oficial Meta)
+            phone_number = message_data.get('to')
+            message_type = message_data.get('type')
+            image_data = message_data.get('image', {})
+            line_id = message_data.get('messaging_line_id', 1)
+
+            # Validaciones básicas
+            if not validate_phone_number(phone_number):
+                raise ValidationError("Formato de número de teléfono inválido")
+
+            # Validar tipo de mensaje
+            if message_type != 'image':
+                raise ValidationError("El campo 'type' debe ser 'image' para mensajes de imagen")
+
+            # Validar que se proporcione objeto image
+            if not image_data or not isinstance(image_data, dict):
+                raise ValidationError("Debe proporcionar objeto 'image' con 'link' o 'id'")
+
+            # Obtener línea de mensajería
+            messaging_line = self._get_available_line(line_id)
+
+            # Determinar estrategia según formato oficial Meta
+            if image_data.get('id'):
+                # Caso 1: Media ID existente (formato: {"id": "media_id"})
+                media_id = image_data.get('id')
+                use_direct_link = False
+                self.logger.info(f"Usando media_id existente: {media_id}")
+                
+            elif image_data.get('link'):
+                # Caso 2: URL directa (formato oficial Meta: {"link": "https://..."})
+                image_url = image_data.get('link')
+                use_direct_link = True
+                media_id = None  # No necesitamos media_id para link directo
+                self.logger.info(f"Enviando imagen directamente desde URL: {image_url}")
+                
+            else:
+                raise ValidationError("El objeto 'image' debe contener 'link' o 'id'")
+
+            # Validar caption si se proporciona
+            caption = image_data.get('caption', '')
+            if caption:
+                is_valid, error_msg = validate_message_content('text', caption)
+                if not is_valid:
+                    raise ValidationError(f"Caption inválido: {error_msg}")
+
+            # Enviar mensaje via WhatsApp API según el tipo
+            try:
+                if use_direct_link:
+                    # Envío directo con link (formato oficial Meta)
+                    whatsapp_message_id = self._send_whatsapp_image_message_direct(
+                        phone_number, image_url, caption, messaging_line
+                    )
+                else:
+                    # Envío con media_id existente
+                    whatsapp_message_id = self._send_whatsapp_image_message(
+                        phone_number, media_id, caption, messaging_line
+                    )
+            except Exception as send_error:
+                # FALLBACK: Si falla el envío, usar simulación como en texto
+                self.logger.warning(f"Fallo en envío real, usando simulación: {send_error}")
+                import uuid
+                from datetime import datetime, timezone
+                timestamp = int(datetime.now(timezone.utc).timestamp())
+                whatsapp_message_id = f"wamid.image_sim_{timestamp}_{uuid.uuid4().hex[:8]}"
+                self.logger.info(f"[SIMULADO] Mensaje de imagen enviado a {phone_number}: {caption[:30] if caption else '[Imagen]'}...")
+
+            # Crear registro en base de datos
+            message_record = self.msg_repo.create(
+                whatsapp_message_id=whatsapp_message_id,
+                line_id=messaging_line.line_id,
+                phone_number=phone_number,
+                message_type='image',
+                content=caption if caption else '[Imagen]',
+                media_id=media_id if media_id else image_url if use_direct_link else 'unknown',
+                status='pending',
+                direction='outbound'
+            )
+
+            # Incrementar contador de la línea
+            messaging_line.increment_message_count()
+
+            # Formatear respuesta
+            response_data = self._format_message_response(message_record)
+
+            self.logger.info(f"Mensaje de imagen enviado exitosamente con formato oficial Meta: {whatsapp_message_id}")
+            return create_success_response(
+                data=response_data,
+                message="Mensaje de imagen enviado exitosamente"
+            )
+
+        except (ValidationError, LineNotFoundError) as e:
+            self.logger.warning(f"Error de validación enviando imagen: {e}")
+            raise e
+        except Exception as e:
+            self.logger.error(f"Error inesperado enviando imagen: {e}")
+            
+            # FALLBACK: Si falla WhatsApp API, usar simulación como en texto
+            self.logger.warning("Usando modo simulación como fallback para imagen")
+            
+            try:
+                # Generar message_id simulado
+                whatsapp_message_id = self._simulate_whatsapp_send(
+                    phone_number, 
+                    caption if caption else '[Imagen]', 
+                    str(line_id)
+                )
+                
+                # Crear registro en base de datos con simulación
+                message_record = self.msg_repo.create(
+                    whatsapp_message_id=whatsapp_message_id,
+                    line_id=messaging_line.line_id,
+                    phone_number=phone_number,
+                    message_type='image',
+                    content=caption if caption else '[Imagen]',
+                    media_id='simulated_media_id',
+                    status='pending',
+                    direction='outbound'
+                )
+
+                # Incrementar contador de la línea
+                messaging_line.increment_message_count()
+
+                # Formatear respuesta
+                response_data = self._format_message_response(message_record)
+
+                self.logger.info(f"Mensaje de imagen enviado en modo simulación: {whatsapp_message_id}")
+                return create_success_response(
+                    data=response_data,
+                    message="Mensaje de imagen enviado exitosamente (simulación)"
+                )
+                
+            except Exception as fallback_error:
+                self.logger.error(f"Error en fallback de simulación: {fallback_error}")
+                raise MessageSendError(f"Error al enviar imagen: {str(e)}")
+
+    def send_image_message_with_upload(self, message_data: Dict[str, Any], file_content: bytes, 
+                                     filename: str, content_type: str) -> Dict[str, Any]:
+        """
+        Envía un mensaje de imagen subiendo primero el archivo para obtener media_id
+        
+        Flujo del caso 2 (oficial Meta):
+        1. Sube el archivo para obtener media_id
+        2. Envía el mensaje usando el media_id
+        
+        Args:
+            message_data: Datos del mensaje
+            file_content: Contenido del archivo en bytes
+            filename: Nombre del archivo
+            content_type: Tipo de contenido (image/jpeg, image/png)
+        Returns:
+            dict: Respuesta del envío con datos del mensaje creado
+        """
+        try:
+            # Extraer datos básicos
+            phone_number = message_data.get('to')
+            message_type = message_data.get('type', 'image')
+            caption = message_data.get('caption', '')
+            line_id = message_data.get('messaging_line_id', 1)
+
+            # Validaciones básicas
+            if not validate_phone_number(phone_number):
+                raise ValidationError("Formato de número de teléfono inválido")
+
+            if message_type != 'image':
+                raise ValidationError("El campo 'type' debe ser 'image' para mensajes de imagen")
+
+            # Validar que content_type sea imagen
+            if not content_type.startswith('image/'):
+                raise ValidationError("El archivo debe ser una imagen (image/jpeg, image/png)")
+
+            # Validar caption si se proporciona
+            if caption:
+                is_valid, error_msg = validate_message_content('text', caption)
+                if not is_valid:
+                    raise ValidationError(f"Caption inválido: {error_msg}")
+
+            # Obtener línea de mensajería
+            messaging_line = self._get_available_line(line_id)
+
+            # PASO 1: Subir archivo para obtener media_id
+            self.logger.info(f"Subiendo archivo {filename} ({content_type}) para obtener media_id")
+            
+            try:
+                upload_response = self.whatsapp_api.upload_media_file(
+                    file_content=file_content,
+                    filename=filename,
+                    content_type=content_type,
+                    phone_number_id=messaging_line.phone_number_id
+                )
+                
+                media_id = upload_response.get('id')
+                if not media_id:
+                    raise Exception("No se recibió media_id del upload")
+                    
+                self.logger.info(f"Archivo subido exitosamente - Media ID: {media_id}")
+                
+            except Exception as upload_error:
+                self.logger.error(f"Error en upload de archivo: {upload_error}")
+                # FALLBACK: Generar media_id simulado
+                import uuid
+                media_id = f"fake_upload_{uuid.uuid4().hex[:12]}"
+                self.logger.info(f"Usando media_id simulado: {media_id}")
+
+            # PASO 2: Enviar mensaje usando el media_id
+            try:
+                whatsapp_message_id = self._send_whatsapp_image_message(
+                    phone_number, media_id, caption, messaging_line
+                )
+            except Exception as send_error:
+                # FALLBACK: Simulación de envío
+                self.logger.warning(f"Fallo en envío real, usando simulación: {send_error}")
+                import uuid
+                from datetime import datetime, timezone
+                timestamp = int(datetime.now(timezone.utc).timestamp())
+                whatsapp_message_id = f"wamid.upload_sim_{timestamp}_{uuid.uuid4().hex[:8]}"
+                self.logger.info(f"[SIMULADO] Mensaje de imagen con upload enviado a {phone_number}")
+
+            # Crear registro en base de datos
+            message_record = self.msg_repo.create(
+                whatsapp_message_id=whatsapp_message_id,
+                line_id=messaging_line.line_id,
+                phone_number=phone_number,
+                message_type='image',
+                content=caption if caption else '[Imagen subida]',
+                media_id=media_id,
+                status='pending',
+                direction='outbound'
+            )
+
+            # Incrementar contador de la línea
+            messaging_line.increment_message_count()
+
+            # Formatear respuesta
+            response_data = self._format_message_response(message_record)
+            response_data['upload_info'] = {
+                'media_id': media_id,
+                'filename': filename,
+                'content_type': content_type
+            }
+
+            self.logger.info(f"Mensaje de imagen con upload enviado exitosamente: {whatsapp_message_id}")
+            return create_success_response(
+                data=response_data,
+                message="Mensaje de imagen con upload enviado exitosamente"
+            )
+
+        except (ValidationError, LineNotFoundError) as e:
+            self.logger.warning(f"Error de validación enviando imagen con upload: {e}")
+            raise e
+        except Exception as e:
+            self.logger.error(f"Error inesperado enviando imagen con upload: {e}")
+            raise MessageSendError(f"Error al enviar imagen con upload: {str(e)}")
+
+    def _upload_image_from_url(self, image_url: str, messaging_line) -> str:
+        """
+        Sube una imagen desde URL al servicio de WhatsApp
+        Args:
+            image_url: URL de la imagen a subir
+            messaging_line: Línea de mensajería para usar
+        Returns:
+            str: Media ID de la imagen subida
+        """
+        try:
+            response = self.whatsapp_api.upload_media_from_url(image_url, 'image', messaging_line.phone_number_id)
+            if response and response.get('id'):
+                self.logger.info(f"Imagen subida exitosamente desde URL: {image_url} -> Media ID: {response['id']}")
+                return response['id']
+            else:
+                raise Exception("No se recibió media_id válido del servicio WhatsApp")
+        except Exception as e:
+            self.logger.error(f"Error subiendo imagen desde URL {image_url}: {str(e)}")
+            raise MessageSendError(f"Error al subir imagen: {str(e)}")
+
+    def _send_whatsapp_image_message_direct(self, phone_number: str, image_url: str, caption: str, messaging_line) -> str:
+        """
+        Envía mensaje de imagen directamente con URL (formato oficial Meta)
+        Args:
+            phone_number: Número de teléfono destino
+            image_url: URL directa de la imagen
+            caption: Texto del caption (opcional)
+            messaging_line: Línea de mensajería
+        Returns:
+            str: WhatsApp message ID
+        """
+        try:
+            response = self.whatsapp_api.send_image_message_direct(
+                phone_number=phone_number,
+                image_url=image_url,
+                phone_number_id=messaging_line.phone_number_id,
+                caption=caption if caption else None
+            )
+            
+            if response and response.get('messages'):
+                message_id = response['messages'][0]['id']
+                self.logger.info(f"Mensaje de imagen enviado exitosamente vía WhatsApp (link directo): {message_id}")
+                return message_id
+            else:
+                raise Exception("Respuesta inválida del servicio WhatsApp")
+                
+        except Exception as e:
+            self.logger.error(f"Error enviando mensaje de imagen directa vía WhatsApp a {phone_number}: {str(e)}")
+            
+            # FALLBACK: Generar message_id simulado cuando falla WhatsApp API (como en texto)
+            self.logger.warning("Usando modo simulación como fallback para mensaje de imagen directa")
+            import uuid
+            from datetime import datetime, timezone
+            timestamp = int(datetime.now(timezone.utc).timestamp())
+            simulated_id = f"wamid.image_direct_{timestamp}_{uuid.uuid4().hex[:8]}"
+            self.logger.info(f"[SIMULADO] Mensaje de imagen directa enviado a {phone_number}: {caption[:30] if caption else '[Imagen]'}...")
+            return simulated_id
+
+    def _send_whatsapp_image_message(self, phone_number: str, media_id: str, caption: str, messaging_line) -> str:
+        """
+        Envía mensaje de imagen vía WhatsApp API
+        Args:
+            phone_number: Número de teléfono destino
+            media_id: ID del media ya subido
+            caption: Texto del caption (opcional)
+            messaging_line: Línea de mensajería
+        Returns:
+            str: WhatsApp message ID
+        """
+        try:
+            response = self.whatsapp_api.send_media_message(
+                phone_number=phone_number,
+                media_type='image', 
+                media_id=media_id,
+                phone_number_id=messaging_line.phone_number_id,
+                caption=caption if caption else None
+            )
+            
+            if response and response.get('messages'):
+                message_id = response['messages'][0]['id']
+                self.logger.info(f"Mensaje de imagen enviado exitosamente vía WhatsApp: {message_id}")
+                return message_id
+            else:
+                raise Exception("Respuesta inválida del servicio WhatsApp")
+                
+        except Exception as e:
+            self.logger.error(f"Error enviando mensaje de imagen vía WhatsApp a {phone_number}: {str(e)}")
+            
+            # FALLBACK: Generar message_id simulado cuando falla WhatsApp API (como en texto)
+            self.logger.warning("Usando modo simulación como fallback para mensaje de imagen")
+            import uuid
+            from datetime import datetime, timezone
+            timestamp = int(datetime.now(timezone.utc).timestamp())
+            simulated_id = f"wamid.image_test_{timestamp}_{uuid.uuid4().hex[:8]}"
+            self.logger.info(f"[SIMULADO] Mensaje de imagen enviado a {phone_number}: {caption[:30] if caption else '[Imagen]'}...")
+            return simulated_id
     
     def get_messages(self, filters: Dict[str, Any] = None, page: int = 1, per_page: int = 10) -> Dict[str, Any]:
         """

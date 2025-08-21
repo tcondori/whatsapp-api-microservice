@@ -13,7 +13,8 @@ from app.utils.helpers import create_error_response
 # Importar definiciones de campos
 from app.api.messages.models import (
     TEXT_MESSAGE_FIELDS, MESSAGE_RESPONSE_FIELDS, UPDATE_STATUS_FIELDS,
-    ERROR_RESPONSE_FIELDS, HEALTH_RESPONSE_FIELDS
+    ERROR_RESPONSE_FIELDS, HEALTH_RESPONSE_FIELDS, IMAGE_MESSAGE_FIELDS, 
+    IMAGE_UPLOAD_MESSAGE_FIELDS, MEDIA_UPLOAD_MESSAGE_FIELDS
 )
 
 # Crear namespace para mensajes
@@ -25,6 +26,9 @@ messages_ns = Namespace(
 
 # Definir modelos usando el namespace
 text_message_request = messages_ns.model('TextMessageRequest', TEXT_MESSAGE_FIELDS)
+image_message_request = messages_ns.model('ImageMessageRequest', IMAGE_MESSAGE_FIELDS)
+image_upload_message_request = messages_ns.model('ImageUploadMessageRequest', IMAGE_UPLOAD_MESSAGE_FIELDS)
+media_upload_message_request = messages_ns.model('MediaUploadMessageRequest', MEDIA_UPLOAD_MESSAGE_FIELDS)
 message_response = messages_ns.model('MessageResponse', MESSAGE_RESPONSE_FIELDS)
 update_status_request = messages_ns.model('UpdateMessageStatusRequest', UPDATE_STATUS_FIELDS)
 error_response = messages_ns.model('ErrorResponse', ERROR_RESPONSE_FIELDS)
@@ -77,7 +81,7 @@ class TextMessageResource(Resource):
             
             # Validar datos requeridos
             if not message_data:
-                api.abort(400, 
+                messages_ns.abort(400, 
                     message="Datos del mensaje requeridos",
                     error_code="MISSING_DATA"
                 )
@@ -86,6 +90,171 @@ class TextMessageResource(Resource):
             result = message_service.send_text_message(message_data)
             
             # Devolver respuesta exitosa
+            return result
+            
+        except ValidationError as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="VALIDATION_ERROR"
+            )
+        except (MessageSendError, LineNotFoundError) as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="MESSAGE_SEND_ERROR"
+            )
+        except Exception as e:
+            messages_ns.abort(500,
+                message="Error interno del servidor",
+                error_code="INTERNAL_ERROR",
+                details=str(e)
+            )
+
+@messages_ns.route('/image')
+class ImageMessageResource(Resource):
+    """
+    Endpoint para envío de mensajes de imagen
+    """
+    
+    @messages_ns.doc('send_image_message', security='ApiKeyAuth')
+    @messages_ns.expect(image_message_request, validate=True)
+    @messages_ns.response(200, 'Mensaje de imagen enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @require_api_key
+    def post(self):
+        """
+        Envía un mensaje de imagen a través de WhatsApp
+        
+        Envía una imagen a un número de teléfono específico. Puede enviar
+        una imagen ya subida (usando media_id) o subir una imagen desde URL.
+        Opcionalmente puede incluir un caption con la imagen.
+        """
+        try:
+            # Obtener datos del request
+            message_data = request.json
+            
+            # Validar datos requeridos
+            if not message_data:
+                messages_ns.abort(400, 
+                    message="Datos del mensaje requeridos",
+                    error_code="MISSING_DATA"
+                )
+            
+            # Enviar mensaje usando el servicio
+            result = message_service.send_image_message(message_data)
+            
+            # Devolver respuesta exitosa
+            return result
+            
+        except ValidationError as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="VALIDATION_ERROR"
+            )
+        except (MessageSendError, LineNotFoundError) as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="MESSAGE_SEND_ERROR"
+            )
+        except Exception as e:
+            messages_ns.abort(500,
+                message="Error interno del servidor",
+                error_code="INTERNAL_ERROR",
+                details=str(e)
+            )
+
+@messages_ns.route('/image/upload')
+class ImageUploadResource(Resource):
+    """
+    Endpoint para envío de imágenes con upload de archivo (Caso 2: media_id)
+    """
+    
+    @messages_ns.doc('send_image_with_upload', security='ApiKeyAuth')
+    @messages_ns.expect(media_upload_message_request, validate=False)  # No validar porque incluye archivo
+    @messages_ns.response(200, 'Mensaje de imagen con upload enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @require_api_key
+    def post(self):
+        """
+        Sube un archivo de imagen y envía mensaje con media_id (Caso 2 oficial Meta)
+        
+        Este endpoint implementa el flujo oficial de Meta WhatsApp Business API:
+        1. Sube el archivo para obtener media_id
+        2. Envía el mensaje usando el media_id
+        
+        Formato multipart/form-data:
+        - file: archivo de imagen (JPG/PNG)
+        - to: número de teléfono destino
+        - type: 'image'
+        - caption: texto opcional
+        - messaging_line_id: ID de línea (opcional)
+        """
+        try:
+            # Validar que sea multipart/form-data
+            if not request.files:
+                messages_ns.abort(400, 
+                    message="Se requiere archivo de imagen en formato multipart/form-data",
+                    error_code="MISSING_FILE"
+                )
+            
+            # Obtener archivo
+            if 'file' not in request.files:
+                messages_ns.abort(400, 
+                    message="Campo 'file' requerido con el archivo de imagen",
+                    error_code="MISSING_FILE_FIELD"
+                )
+                
+            file = request.files['file']
+            if file.filename == '':
+                messages_ns.abort(400, 
+                    message="No se seleccionó ningún archivo",
+                    error_code="EMPTY_FILE"
+                )
+
+            # Validar tipo de archivo
+            if not file.content_type or not file.content_type.startswith('image/'):
+                messages_ns.abort(400, 
+                    message="El archivo debe ser una imagen (JPEG/PNG)",
+                    error_code="INVALID_FILE_TYPE"
+                )
+
+            # Obtener datos del formulario
+            to = request.form.get('to')
+            message_type = request.form.get('type', 'image')
+            caption = request.form.get('caption', '')
+            messaging_line_id = request.form.get('messaging_line_id', 1, type=int)
+
+            # Validar datos requeridos
+            if not to:
+                messages_ns.abort(400, 
+                    message="Campo 'to' requerido con el número de teléfono destino",
+                    error_code="MISSING_TO_FIELD"
+                )
+
+            # Preparar datos del mensaje
+            message_data = {
+                'to': to,
+                'type': message_type,
+                'caption': caption,
+                'messaging_line_id': messaging_line_id
+            }
+
+            # Leer contenido del archivo
+            file_content = file.read()
+            filename = file.filename
+            content_type = file.content_type
+
+            # Enviar mensaje con upload usando el servicio
+            result = message_service.send_image_message_with_upload(
+                message_data=message_data,
+                file_content=file_content,
+                filename=filename,
+                content_type=content_type
+            )
+            
             return result
             
         except ValidationError as e:
@@ -159,12 +328,12 @@ class MessageListResource(Resource):
             return result
             
         except ValidationError as e:
-            api.abort(400,
+            messages_ns.abort(400,
                 message=str(e),
                 error_code="VALIDATION_ERROR"
             )
         except Exception as e:
-            api.abort(500,
+            messages_ns.abort(500,
                 message="Error interno del servidor",
                 error_code="INTERNAL_ERROR",
                 details=str(e)
@@ -358,11 +527,13 @@ class MessageTestResource(Resource):
                     'total_messages': total_messages,
                     'available_lines': available_lines,
                     'supported_endpoints': [
-                        'POST /api/v1/messages/text - Enviar mensaje de texto',
-                        'GET /api/v1/messages - Listar mensajes con filtros',
-                        'GET /api/v1/messages/{id} - Obtener mensaje por ID',
-                        'GET /api/v1/messages/whatsapp/{whatsapp_id} - Obtener por ID de WhatsApp',
-                        'PATCH /api/v1/messages/whatsapp/{whatsapp_id}/status - Actualizar estado'
+                        'POST /v1/messages/text - Enviar mensaje de texto',
+                        'POST /v1/messages/image - Enviar mensaje de imagen (URL directa o media_id)',
+                        'POST /v1/messages/image/upload - Subir archivo y enviar imagen (Caso 2: media_id)',
+                        'GET /v1/messages - Listar mensajes con filtros',
+                        'GET /v1/messages/{id} - Obtener mensaje por ID',
+                        'GET /v1/messages/whatsapp/{whatsapp_id} - Obtener por ID de WhatsApp',
+                        'PATCH /v1/messages/whatsapp/{whatsapp_id}/status - Actualizar estado'
                     ]
                 }
             }

@@ -101,7 +101,7 @@ class MessagingLine(BaseModel):
     """
     __tablename__ = 'messaging_lines'
     
-    line_id = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    line_id = db.Column(db.Integer, unique=True, nullable=False, index=True)
     phone_number_id = db.Column(db.String(255), nullable=False)
     display_name = db.Column(db.String(255), nullable=False)
     phone_number = db.Column(db.String(20))

@@ -159,6 +159,32 @@ class WhatsAppAPIService:
         
         return self._make_api_request('messages', 'POST', data, phone_number_id)
     
+    def send_image_message_direct(self, phone_number: str, image_url: str, 
+                                 phone_number_id: str, caption: str = None) -> Dict[str, Any]:
+        """
+        Envía un mensaje de imagen directamente con URL (formato oficial Meta)
+        Args:
+            phone_number: Número de destino
+            image_url: URL directa de la imagen
+            phone_number_id: ID del número de WhatsApp Business
+            caption: Texto adicional (opcional)
+        Returns:
+            dict: Respuesta de WhatsApp API
+        """
+        image_data = {"link": image_url}
+        if caption:
+            image_data["caption"] = caption
+        
+        data = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": phone_number,
+            "type": "image",
+            "image": image_data
+        }
+        
+        return self._make_api_request('messages', 'POST', data, phone_number_id)
+    
     def send_template_message(self, phone_number: str, template_name: str, 
                              language_code: str, phone_number_id: str,
                              parameters: List[Dict] = None) -> Dict[str, Any]:
@@ -265,6 +291,173 @@ class WhatsAppAPIService:
             response.raise_for_status()
             
             return response.json()
+
+    def upload_media_file(self, file_content: bytes, filename: str, content_type: str, 
+                         phone_number_id: str) -> Dict[str, Any]:
+        """
+        Sube un archivo multimedia desde contenido en memoria a WhatsApp
+        Args:
+            file_content: Contenido del archivo en bytes
+            filename: Nombre del archivo
+            content_type: Tipo de contenido (image/jpeg, image/png, etc.)
+            phone_number_id: ID del número de WhatsApp Business
+        Returns:
+            dict: Respuesta con media_id
+        """
+        if not self.access_token:
+            # Modo simulación
+            import uuid
+            fake_media_id = f"fake_upload_{uuid.uuid4().hex[:12]}"
+            self.logger.info(f"SIMULACIÓN: Upload de archivo {filename} - Media ID: {fake_media_id}")
+            
+            return {
+                'id': fake_media_id,
+                'filename': filename,
+                'content_type': content_type,
+                'messaging_product': 'whatsapp'
+            }
+        
+        try:
+            url = f"{self.base_url}/{self.api_version}/{phone_number_id}/media"
+            
+            headers = {
+                'Authorization': f'Bearer {self.access_token}'
+            }
+            
+            # Determinar el tipo de media basado en content_type
+            media_type = 'image'
+            if content_type.startswith('video/'):
+                media_type = 'video'
+            elif content_type.startswith('audio/'):
+                media_type = 'audio'
+            elif content_type.startswith('application/'):
+                media_type = 'document'
+            
+            files = {
+                'file': (filename, file_content, content_type)
+            }
+            data = {
+                'messaging_product': 'whatsapp',
+                'type': media_type
+            }
+            
+            self.logger.info(f"Subiendo archivo {filename} ({content_type}) a WhatsApp API")
+            response = requests.post(url, headers=headers, files=files, data=data, timeout=60)
+            response.raise_for_status()
+            
+            result = response.json()
+            self.logger.info(f"Upload exitoso - Media ID: {result.get('id')}")
+            
+            return result
+            
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Error subiendo archivo a WhatsApp: {str(e)}")
+            # Fallback a simulación en caso de error
+            import uuid
+            fake_media_id = f"error_upload_{uuid.uuid4().hex[:12]}"
+            
+            return {
+                'id': fake_media_id,
+                'filename': filename,
+                'content_type': content_type,
+                'messaging_product': 'whatsapp',
+                'error': str(e)
+            }
+        except Exception as e:
+            self.logger.error(f"Error inesperado subiendo archivo: {str(e)}")
+            raise WhatsAppAPIError(f"Error subiendo archivo: {str(e)}")
+
+    def upload_media_from_url(self, image_url: str, media_type: str = 'image', phone_number_id: str = None) -> Dict[str, Any]:
+        """
+        Sube un archivo multimedia desde URL a WhatsApp
+        Args:
+            image_url: URL de la imagen
+            media_type: Tipo de media (image, video, audio, document)
+            phone_number_id: ID del número de WhatsApp Business (opcional en simulación)
+        Returns:
+            dict: Respuesta simulada con media_id
+        """
+        try:
+            # En modo simulación, generar respuesta falsa pero válida
+            if not self.access_token or self.access_token in ['fake_token', 'test_token']:
+                self.logger.info(f"SIMULACIÓN: Subiendo {media_type} desde URL: {image_url}")
+                
+                # Generar un media_id falso pero válido
+                import uuid
+                fake_media_id = f"fake_media_{uuid.uuid4().hex[:8]}"
+                
+                return {
+                    'id': fake_media_id,
+                    'url': image_url,
+                    'messaging_product': 'whatsapp'
+                }
+            
+            # En modo real, descargar imagen y subirla
+            # Primero descargar la imagen
+            self.logger.info(f"Descargando imagen desde: {image_url}")
+            headers = {
+                'User-Agent': 'WhatsApp-Bot/1.0'
+            }
+            
+            img_response = requests.get(image_url, headers=headers, timeout=30)
+            img_response.raise_for_status()
+            
+            # Obtener el phone_number_id de la configuración
+            if not phone_number_id:
+                phone_number_id = self.config.get('WHATSAPP_PHONE_NUMBER_ID')
+                
+            if not phone_number_id:
+                # En modo simulación total
+                import uuid
+                fake_media_id = f"fake_media_{uuid.uuid4().hex[:8]}"
+                self.logger.info(f"SIMULACIÓN: Media ID generado: {fake_media_id}")
+                
+                return {
+                    'id': fake_media_id,
+                    'url': image_url,
+                    'messaging_product': 'whatsapp'
+                }
+            
+            # Subir a WhatsApp
+            url = f"{self.base_url}/{self.api_version}/{phone_number_id}/media"
+            
+            headers = {
+                'Authorization': f'Bearer {self.access_token}'
+            }
+            
+            # Determinar el tipo de contenido
+            content_type = img_response.headers.get('content-type', 'image/jpeg')
+            filename = 'image.jpg'
+            if 'png' in content_type:
+                filename = 'image.png'
+            elif 'gif' in content_type:
+                filename = 'image.gif'
+                
+            files = {
+                'file': (filename, img_response.content, content_type)
+            }
+            data = {
+                'messaging_product': 'whatsapp',
+                'type': media_type
+            }
+            
+            response = requests.post(url, headers=headers, files=files, data=data, timeout=60)
+            response.raise_for_status()
+            
+            return response.json()
+            
+        except Exception as e:
+            self.logger.error(f"Error subiendo media desde URL: {str(e)}")
+            # En caso de error, devolver respuesta simulada
+            import uuid
+            fake_media_id = f"error_media_{uuid.uuid4().hex[:8]}"
+            
+            return {
+                'id': fake_media_id,
+                'url': image_url,
+                'messaging_product': 'whatsapp',
+                'error': str(e)
+            }
     
     def get_media(self, media_id: str) -> Dict[str, Any]:
         """

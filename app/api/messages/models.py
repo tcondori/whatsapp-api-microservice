@@ -24,6 +24,85 @@ TEXT_MESSAGE_FIELDS = {
     )
 }
 
+# Definición de campos para mensaje de imagen (formato oficial Meta/WhatsApp)
+IMAGE_MESSAGE_FIELDS = {
+    'to': fields.String(
+        required=True,
+        description='Número de teléfono destino en formato internacional',
+        example='5491123456789'
+    ),
+    'type': fields.String(
+        required=True,
+        description='Tipo de mensaje multimedia',
+        enum=['image'],
+        default='image',
+        example='image'
+    ),
+    'image': fields.Raw(
+        required=True,
+        description='Datos de la imagen según formato oficial WhatsApp Business API',
+        example={
+            'link': 'https://example.com/image.jpg',
+            'caption': 'Descripción opcional de la imagen'
+        }
+    ),
+    'messaging_line_id': fields.Integer(
+        required=False,
+        description='ID de la línea de mensajería a utilizar',
+        example=1
+    )
+}
+
+# Definición de campos para mensaje de imagen con upload por archivo
+MEDIA_UPLOAD_MESSAGE_FIELDS = {
+    'to': fields.String(
+        required=True,
+        description='Número de teléfono destino en formato internacional',
+        example='5491123456789'
+    ),
+    'type': fields.String(
+        required=True,
+        description='Tipo de mensaje multimedia',
+        enum=['image'],
+        default='image',
+        example='image'
+    ),
+    'caption': fields.String(
+        required=False,
+        description='Texto descriptivo de la imagen',
+        example='Esta es una imagen subida'
+    ),
+    'messaging_line_id': fields.Integer(
+        required=False,
+        description='ID de la línea de mensajería a utilizar',
+        example=1
+    )
+}
+
+# Definición alternativa para imagen con upload directo
+IMAGE_UPLOAD_MESSAGE_FIELDS = {
+    'to': fields.String(
+        required=True,
+        description='Número de teléfono destino en formato internacional',
+        example='5491123456789'
+    ),
+    'image_url': fields.String(
+        required=False,
+        description='URL de la imagen (alternativa a upload)',
+        example='https://example.com/image.jpg'
+    ),
+    'caption': fields.String(
+        required=False,
+        description='Texto descriptivo de la imagen',
+        example='Esta es una imagen de ejemplo'
+    ),
+    'messaging_line_id': fields.Integer(
+        required=False,
+        description='ID de la línea de mensajería a utilizar',
+        example=1
+    )
+}
+
 # Definición de campos para respuesta de mensaje
 MESSAGE_RESPONSE_FIELDS = {
     'success': fields.Boolean(

@@ -23,7 +23,7 @@ def create_api(app):
         title='WhatsApp Business API',
         description='Microservicio para integración con WhatsApp Business API',
         doc='/docs/',
-        prefix='/api/v1'
+        prefix='/v1'  # CORREGIDO: era '/api/v1' ahora es '/v1'
     )
     
     # Registrar namespaces
