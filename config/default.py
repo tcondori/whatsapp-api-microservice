@@ -4,10 +4,17 @@ Incluye configuración de WhatsApp API, base de datos, Redis y seguridad
 """
 import os
 import json
+from datetime import timezone, timedelta
 
 class DefaultConfig:
     """Configuración base compartida por todos los entornos"""
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+    
+    # Configuración de zona horaria
+    # Por defecto: UTC-4 (Georgetown, La Paz, Manaos, San Juan)
+    TIMEZONE_OFFSET = int(os.getenv('TIMEZONE_OFFSET', '-4'))  # Offset en horas desde UTC
+    TIMEZONE_NAME = os.getenv('TIMEZONE_NAME', 'America/La_Paz')
+    TIMEZONE = timezone(timedelta(hours=TIMEZONE_OFFSET))
     
     # Configuración de WhatsApp API
     WHATSAPP_API_VERSION = os.getenv('WHATSAPP_API_VERSION', 'v18.0')

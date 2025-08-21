@@ -366,12 +366,14 @@ class MessageService:
     
     def _format_message_response(self, message) -> Dict[str, Any]:
         """
-        Formatea un mensaje para respuesta de API
+        Formatea un mensaje para respuesta de API con fechas en zona horaria local
         Args:
             message: Instancia del modelo Message
         Returns:
-            dict: Mensaje formateado
+            dict: Mensaje formateado con fechas en hora local
         """
+        from app.utils.date_utils import format_datetime
+        
         return {
             'id': str(message.id),
             'whatsapp_message_id': message.whatsapp_message_id,
@@ -381,8 +383,8 @@ class MessageService:
             'status': message.status,
             'direction': message.direction,
             'line_id': message.line_id,
-            'created_at': message.created_at.isoformat() + 'Z' if message.created_at else None,
-            'updated_at': message.updated_at.isoformat() + 'Z' if message.updated_at else None,
+            'created_at': format_datetime(message.created_at),
+            'updated_at': format_datetime(message.updated_at),
             'retry_count': message.retry_count,
             'error_message': message.error_message
         }

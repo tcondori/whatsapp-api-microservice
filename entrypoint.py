@@ -165,6 +165,9 @@ def _register_api_namespaces(api: Api):
         def get(self):
             """Health check general de la aplicación"""
             from app.extensions import is_redis_available
+            from app.utils.date_utils import get_timezone_info, now_local, now_utc
+            
+            timezone_info = get_timezone_info()
             
             return {
                 'status': 'healthy',
@@ -178,6 +181,12 @@ def _register_api_namespaces(api: Api):
                     'contacts': 'ready', 
                     'media': 'ready',
                     'webhooks': 'ready'
+                },
+                'timezone': {
+                    'name': timezone_info['timezone_name'],
+                    'offset': timezone_info['offset_string'],
+                    'current_local_time': timezone_info['current_local'],
+                    'current_utc_time': timezone_info['current_utc']
                 }
             }
 

@@ -9,17 +9,24 @@ import logging
 
 def create_success_response(data: Any = None, message: str = "Operación exitosa") -> dict:
     """
-    Crea respuesta de éxito estándar
+    Crea respuesta de éxito estándar con timestamp en zona horaria local
     Args:
         data: Datos a incluir en la respuesta
         message: Mensaje descriptivo
     Returns:
         dict: Respuesta estructurada
     """
+    try:
+        from app.utils.date_utils import now_local
+        timestamp = now_local().isoformat()
+    except:
+        # Fallback a UTC si hay problemas con zona horaria local
+        timestamp = datetime.now(timezone.utc).isoformat()
+    
     response = {
         'success': True,
         'message': message,
-        'timestamp': datetime.now(timezone.utc).isoformat()
+        'timestamp': timestamp
     }
     
     if data is not None:

@@ -89,7 +89,7 @@ class TextMessageResource(Resource):
             return result
             
         except ValidationError as e:
-            api.abort(400,
+            messages_ns.abort(400,
                 message=str(e),
                 error_code="VALIDATION_ERROR"
             )

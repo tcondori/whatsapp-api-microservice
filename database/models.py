@@ -25,18 +25,33 @@ class BaseModel(db.Model):
         onupdate=datetime.utcnow
     )
     
-    def to_dict(self):
+    def to_dict(self, convert_dates_to_local=True):
         """
         Convierte el modelo a diccionario para serialización JSON
+        
+        Args:
+            convert_dates_to_local: Si True, convierte fechas UTC a zona horaria local
+            
         Returns:
             dict: Representación del modelo como diccionario
         """
-        return {
-            column.name: str(getattr(self, column.name)) 
-            if isinstance(getattr(self, column.name), (datetime, uuid.UUID, date))
-            else getattr(self, column.name)
-            for column in self.__table__.columns
-        }
+        from app.utils.date_utils import format_datetime
+        
+        result = {}
+        for column in self.__table__.columns:
+            value = getattr(self, column.name)
+            
+            if isinstance(value, datetime):
+                if convert_dates_to_local:
+                    result[column.name] = format_datetime(value)
+                else:
+                    result[column.name] = value.isoformat() if value else None
+            elif isinstance(value, (uuid.UUID, date)):
+                result[column.name] = str(value)
+            else:
+                result[column.name] = value
+                
+        return result
     
     def save(self):
         """
