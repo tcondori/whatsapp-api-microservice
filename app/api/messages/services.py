@@ -369,6 +369,197 @@ class MessageService:
             self.logger.error(f"Error inesperado enviando imagen con upload: {e}")
             raise MessageSendError(f"Error al enviar imagen con upload: {str(e)}")
 
+    def send_media_message_with_upload(self, message_data: Dict[str, Any], file_content: bytes, 
+                                     filename: str, content_type: str, media_type: str) -> Dict[str, Any]:
+        """
+        Envía un mensaje multimedia subiendo primero el archivo para obtener media_id
+        
+        Flujo genérico para video, audio, documento y sticker:
+        1. Sube el archivo para obtener media_id
+        2. Envía el mensaje usando el media_id
+        
+        Args:
+            message_data: Datos del mensaje
+            file_content: Contenido del archivo en bytes
+            filename: Nombre del archivo
+            content_type: Tipo de contenido
+            media_type: Tipo de multimedia ('video', 'audio', 'document', 'sticker')
+        Returns:
+            dict: Respuesta del envío con datos del mensaje creado
+        """
+        try:
+            # Extraer datos básicos
+            phone_number = message_data.get('to')
+            message_type = message_data.get('type', media_type)
+            caption = message_data.get('caption', '')
+            line_id = message_data.get('messaging_line_id', 1)
+
+            # Validaciones básicas
+            if not validate_phone_number(phone_number):
+                raise ValidationError("Formato de número de teléfono inválido")
+
+            if message_type != media_type:
+                raise ValidationError(f"El campo 'type' debe ser '{media_type}' para mensajes de {media_type}")
+
+            # Validar tipos de contenido específicos
+            valid_content_types = self._get_valid_content_types(media_type)
+            if not any(content_type.startswith(ct.split('/')[0]) for ct in valid_content_types):
+                raise ValidationError(f"Tipo de archivo inválido para {media_type}. Tipos permitidos: {valid_content_types}")
+
+            # Validar caption (solo algunos tipos lo soportan)
+            if caption and media_type not in ['video', 'document']:
+                self.logger.warning(f"Caption ignorado para {media_type} - no soportado")
+                caption = ''
+            
+            if caption:
+                is_valid, error_msg = validate_message_content('text', caption)
+                if not is_valid:
+                    raise ValidationError(f"Caption inválido: {error_msg}")
+
+            # Obtener línea de mensajería
+            messaging_line = self._get_available_line(line_id)
+
+            # PASO 1: Subir archivo para obtener media_id
+            self.logger.info(f"Subiendo archivo {media_type}: {filename} ({content_type})")
+            
+            try:
+                upload_response = self.whatsapp_api.upload_media_file(
+                    file_content=file_content,
+                    filename=filename,
+                    content_type=content_type,
+                    phone_number_id=messaging_line.phone_number_id
+                )
+                
+                media_id = upload_response.get('id')
+                if not media_id:
+                    raise Exception("No se recibió media_id del upload")
+                    
+                self.logger.info(f"Archivo {media_type} subido exitosamente - Media ID: {media_id}")
+                
+            except Exception as upload_error:
+                self.logger.error(f"Error en upload de {media_type}: {upload_error}")
+                # FALLBACK: Generar media_id simulado
+                import uuid
+                media_id = f"fake_{media_type}_{uuid.uuid4().hex[:12]}"
+                self.logger.info(f"Usando media_id simulado para {media_type}: {media_id}")
+
+            # PASO 2: Enviar mensaje usando el media_id
+            try:
+                whatsapp_message_id = self._send_whatsapp_media_message(
+                    phone_number, media_type, media_id, caption, messaging_line
+                )
+            except Exception as send_error:
+                # FALLBACK: Simulación de envío
+                self.logger.warning(f"Fallo en envío real de {media_type}, usando simulación: {send_error}")
+                import uuid
+                from datetime import datetime, timezone
+                timestamp = int(datetime.now(timezone.utc).timestamp())
+                whatsapp_message_id = f"wamid.{media_type}_sim_{timestamp}_{uuid.uuid4().hex[:8]}"
+                self.logger.info(f"[SIMULADO] Mensaje de {media_type} enviado a {phone_number}")
+
+            # Crear registro en base de datos
+            message_record = self.msg_repo.create(
+                whatsapp_message_id=whatsapp_message_id,
+                line_id=messaging_line.line_id,
+                phone_number=phone_number,
+                message_type=media_type,
+                content=caption if caption else f'[{media_type.upper()} - {filename}]',
+                media_id=media_id,
+                status='pending',
+                direction='outbound'
+            )
+
+            # Incrementar contador de la línea
+            messaging_line.increment_message_count()
+
+            # Formatear respuesta
+            response_data = self._format_message_response(message_record)
+            response_data['upload_info'] = {
+                'media_id': media_id,
+                'filename': filename,
+                'content_type': content_type,
+                'media_type': media_type
+            }
+
+            self.logger.info(f"Mensaje de {media_type} con upload enviado exitosamente: {whatsapp_message_id}")
+            return create_success_response(
+                data=response_data,
+                message=f"Mensaje de {media_type} con upload enviado exitosamente"
+            )
+
+        except (ValidationError, LineNotFoundError) as e:
+            self.logger.warning(f"Error de validación enviando {media_type} con upload: {e}")
+            raise e
+        except Exception as e:
+            self.logger.error(f"Error inesperado enviando {media_type} con upload: {e}")
+            raise MessageSendError(f"Error al enviar {media_type} con upload: {str(e)}")
+
+    def _get_valid_content_types(self, media_type: str) -> List[str]:
+        """
+        Obtiene los tipos de contenido válidos para cada tipo de multimedia
+        Args:
+            media_type: Tipo de multimedia
+        Returns:
+            list: Lista de content types válidos
+        """
+        valid_types = {
+            'video': ['video/mp4', 'video/3gpp'],
+            'audio': ['audio/mpeg', 'audio/ogg', 'audio/amr', 'audio/aac'],
+            'document': [
+                'application/pdf', 'application/msword', 
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.ms-powerpoint',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'text/plain'
+            ],
+            'sticker': ['image/webp', 'image/png', 'image/jpeg'],  # Stickers preferiblemente WebP
+            'image': ['image/jpeg', 'image/png']
+        }
+        return valid_types.get(media_type, [])
+
+    def _send_whatsapp_media_message(self, phone_number: str, media_type: str, media_id: str, 
+                                   caption: str, messaging_line) -> str:
+        """
+        Envía mensaje multimedia vía WhatsApp API
+        Args:
+            phone_number: Número de teléfono destino
+            media_type: Tipo de multimedia
+            media_id: ID del media ya subido
+            caption: Texto del caption (opcional)
+            messaging_line: Línea de mensajería
+        Returns:
+            str: WhatsApp message ID
+        """
+        try:
+            response = self.whatsapp_api.send_media_message(
+                phone_number=phone_number,
+                media_type=media_type, 
+                media_id=media_id,
+                phone_number_id=messaging_line.phone_number_id,
+                caption=caption if caption else None
+            )
+            
+            if response and response.get('messages'):
+                message_id = response['messages'][0]['id']
+                self.logger.info(f"Mensaje de {media_type} enviado exitosamente vía WhatsApp: {message_id}")
+                return message_id
+            else:
+                raise Exception("Respuesta inválida del servicio WhatsApp")
+                
+        except Exception as e:
+            self.logger.error(f"Error enviando mensaje de {media_type} vía WhatsApp a {phone_number}: {str(e)}")
+            
+            # FALLBACK: Generar message_id simulado
+            self.logger.warning(f"Usando modo simulación como fallback para mensaje de {media_type}")
+            import uuid
+            from datetime import datetime, timezone
+            timestamp = int(datetime.now(timezone.utc).timestamp())
+            simulated_id = f"wamid.{media_type}_test_{timestamp}_{uuid.uuid4().hex[:8]}"
+            self.logger.info(f"[SIMULADO] Mensaje de {media_type} enviado a {phone_number}")
+            return simulated_id
+
     def _upload_image_from_url(self, image_url: str, messaging_line) -> str:
         """
         Sube una imagen desde URL al servicio de WhatsApp

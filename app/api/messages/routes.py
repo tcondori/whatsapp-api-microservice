@@ -274,6 +274,196 @@ class ImageUploadResource(Resource):
                 details=str(e)
             )
 
+@messages_ns.route('/video/upload')
+class VideoUploadResource(Resource):
+    """
+    Endpoint para envío de videos con upload de archivo
+    """
+    
+    @messages_ns.doc('send_video_with_upload', security='ApiKeyAuth')
+    @messages_ns.expect(media_upload_message_request, validate=False)
+    @messages_ns.response(200, 'Mensaje de video con upload enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @require_api_key
+    def post(self):
+        """
+        Sube un archivo de video y envía mensaje con media_id
+        
+        Formato multipart/form-data:
+        - file: archivo de video (MP4/3GPP)
+        - to: número de teléfono destino
+        - type: 'video'
+        - caption: texto opcional
+        - messaging_line_id: ID de línea (opcional)
+        """
+        return self._handle_media_upload('video', ['video/mp4', 'video/3gpp'])
+    
+    def _handle_media_upload(self, media_type: str, allowed_content_types: list):
+        """Maneja el upload genérico de archivos multimedia"""
+        try:
+            # Validar que sea multipart/form-data
+            if not request.files or 'file' not in request.files:
+                messages_ns.abort(400, 
+                    message=f"Campo 'file' requerido con el archivo de {media_type}",
+                    error_code="MISSING_FILE_FIELD"
+                )
+            
+            file = request.files['file']
+            if file.filename == '':
+                messages_ns.abort(400, 
+                    message="No se seleccionó ningún archivo",
+                    error_code="EMPTY_FILE"
+                )
+
+            # Validar tipo de archivo
+            if not file.content_type or not any(file.content_type.startswith(ct.split('/')[0]) for ct in allowed_content_types):
+                messages_ns.abort(400, 
+                    message=f"El archivo debe ser de tipo {media_type} ({', '.join(allowed_content_types)})",
+                    error_code="INVALID_FILE_TYPE"
+                )
+
+            # Obtener datos del formulario
+            to = request.form.get('to')
+            message_type = request.form.get('type', media_type)
+            caption = request.form.get('caption', '')
+            messaging_line_id = request.form.get('messaging_line_id', 1, type=int)
+
+            # Validar datos requeridos
+            if not to:
+                messages_ns.abort(400, 
+                    message="Campo 'to' requerido con el número de teléfono destino",
+                    error_code="MISSING_TO_FIELD"
+                )
+
+            # Preparar datos del mensaje
+            message_data = {
+                'to': to,
+                'type': message_type,
+                'caption': caption if caption else '',
+                'messaging_line_id': messaging_line_id
+            }
+
+            # Leer contenido del archivo
+            file_content = file.read()
+            filename = file.filename
+            content_type = file.content_type
+
+            # Enviar mensaje con upload usando el servicio
+            result = message_service.send_media_message_with_upload(
+                message_data=message_data,
+                file_content=file_content,
+                filename=filename,
+                content_type=content_type,
+                media_type=media_type
+            )
+            
+            return result
+            
+        except ValidationError as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="VALIDATION_ERROR"
+            )
+        except (MessageSendError, LineNotFoundError) as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="MESSAGE_SEND_ERROR"
+            )
+        except Exception as e:
+            messages_ns.abort(500,
+                message="Error interno del servidor",
+                error_code="INTERNAL_ERROR",
+                details=str(e)
+            )
+
+@messages_ns.route('/audio/upload')
+class AudioUploadResource(Resource):
+    """
+    Endpoint para envío de audios con upload de archivo
+    """
+    
+    @messages_ns.doc('send_audio_with_upload', security='ApiKeyAuth')
+    @messages_ns.expect(media_upload_message_request, validate=False)
+    @messages_ns.response(200, 'Mensaje de audio con upload enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @require_api_key
+    def post(self):
+        """
+        Sube un archivo de audio y envía mensaje con media_id
+        
+        Formato multipart/form-data:
+        - file: archivo de audio (MP3/OGG/AMR/AAC)
+        - to: número de teléfono destino
+        - type: 'audio'
+        - messaging_line_id: ID de línea (opcional)
+        
+        Nota: Los audios NO soportan caption
+        """
+        return VideoUploadResource()._handle_media_upload('audio', ['audio/mpeg', 'audio/ogg', 'audio/amr', 'audio/aac'])
+
+@messages_ns.route('/document/upload')
+class DocumentUploadResource(Resource):
+    """
+    Endpoint para envío de documentos con upload de archivo
+    """
+    
+    @messages_ns.doc('send_document_with_upload', security='ApiKeyAuth')
+    @messages_ns.expect(media_upload_message_request, validate=False)
+    @messages_ns.response(200, 'Mensaje de documento con upload enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @require_api_key
+    def post(self):
+        """
+        Sube un documento y envía mensaje con media_id
+        
+        Formato multipart/form-data:
+        - file: archivo de documento (PDF/DOC/DOCX/PPT/PPTX/XLS/XLSX/TXT)
+        - to: número de teléfono destino
+        - type: 'document'
+        - caption: texto opcional
+        - messaging_line_id: ID de línea (opcional)
+        """
+        allowed_types = [
+            'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/plain'
+        ]
+        return VideoUploadResource()._handle_media_upload('document', allowed_types)
+
+@messages_ns.route('/sticker/upload')
+class StickerUploadResource(Resource):
+    """
+    Endpoint para envío de stickers con upload de archivo
+    """
+    
+    @messages_ns.doc('send_sticker_with_upload', security='ApiKeyAuth')
+    @messages_ns.expect(media_upload_message_request, validate=False)
+    @messages_ns.response(200, 'Mensaje de sticker con upload enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @require_api_key
+    def post(self):
+        """
+        Sube un sticker y envía mensaje con media_id
+        
+        Formato multipart/form-data:
+        - file: archivo de sticker (WEBP estático)
+        - to: número de teléfono destino
+        - type: 'sticker'
+        - messaging_line_id: ID de línea (opcional)
+        
+        Nota: Los stickers NO soportan caption y deben ser WEBP estáticos
+        """
+        return VideoUploadResource()._handle_media_upload('sticker', ['image/webp', 'image/jpeg', 'image/png'])
+
 @messages_ns.route('')
 class MessageListResource(Resource):
     """
@@ -530,6 +720,10 @@ class MessageTestResource(Resource):
                         'POST /v1/messages/text - Enviar mensaje de texto',
                         'POST /v1/messages/image - Enviar mensaje de imagen (URL directa o media_id)',
                         'POST /v1/messages/image/upload - Subir archivo y enviar imagen (Caso 2: media_id)',
+                        'POST /v1/messages/video/upload - Subir archivo y enviar video',
+                        'POST /v1/messages/audio/upload - Subir archivo y enviar audio',
+                        'POST /v1/messages/document/upload - Subir archivo y enviar documento',
+                        'POST /v1/messages/sticker/upload - Subir archivo y enviar sticker',
                         'GET /v1/messages - Listar mensajes con filtros',
                         'GET /v1/messages/{id} - Obtener mensaje por ID',
                         'GET /v1/messages/whatsapp/{whatsapp_id} - Obtener por ID de WhatsApp',
