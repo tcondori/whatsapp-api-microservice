@@ -101,6 +101,56 @@ def validate_message_content(message_type: str, content: Any) -> tuple[bool, str
         if not content.get('url') and not content.get('id'):
             return False, f"{message_type} debe incluir 'url' o 'id'"
     
+    # Validar mensajes de ubicación
+    elif message_type == 'location':
+        if not isinstance(content, dict):
+            return False, "Contenido de ubicación debe ser un objeto"
+        
+        # Campos requeridos
+        if 'latitude' not in content or 'longitude' not in content:
+            return False, "Ubicación debe incluir 'latitude' y 'longitude'"
+        
+        try:
+            lat = float(content['latitude'])
+            lng = float(content['longitude'])
+            
+            # Validar rangos válidos
+            if not (-90 <= lat <= 90):
+                return False, "Latitud debe estar entre -90 y 90 grados"
+            
+            if not (-180 <= lng <= 180):
+                return False, "Longitud debe estar entre -180 y 180 grados"
+                
+        except (ValueError, TypeError):
+            return False, "Latitud y longitud deben ser números válidos"
+    
+    # Validar mensajes de contactos
+    elif message_type == 'contacts':
+        if not isinstance(content, list):
+            return False, "Contenido de contactos debe ser una lista"
+        
+        if len(content) == 0:
+            return False, "La lista de contactos no puede estar vacía"
+        
+        if len(content) > 20:
+            return False, "WhatsApp permite máximo 20 contactos por mensaje"
+        
+        # Validar estructura básica de cada contacto
+        for i, contact in enumerate(content):
+            if not isinstance(contact, dict):
+                return False, f"Contacto en posición {i} debe ser un objeto"
+            
+            if 'name' not in contact:
+                return False, f"Contacto en posición {i} debe incluir campo 'name'"
+            
+            name = contact['name']
+            if not isinstance(name, dict):
+                return False, f"Campo 'name' del contacto {i} debe ser un objeto"
+            
+            # Debe tener formatted_name o first_name
+            if not name.get('formatted_name') and not name.get('first_name'):
+                return False, f"Contacto {i} debe tener 'formatted_name' o 'first_name'"
+    
     # Validar mensajes interactivos
     elif message_type == 'interactive':
         if not isinstance(content, dict):

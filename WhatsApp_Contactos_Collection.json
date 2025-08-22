@@ -1,0 +1,121 @@
+{
+    "info": {
+        "name": "WhatsApp Contactos API",
+        "description": "Colección para probar el endpoint de contactos de WhatsApp Business API",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Contacto Básico",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "X-API-Key",
+                        "value": "dev-api-key"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"to\": \"5491123456789\",\n    \"type\": \"contacts\",\n    \"contacts\": [\n        {\n            \"name\": {\n                \"formatted_name\": \"Juan Perez\",\n                \"first_name\": \"Juan\",\n                \"last_name\": \"Perez\"\n            },\n            \"phones\": [\n                {\n                    \"phone\": \"+5491123456789\",\n                    \"type\": \"WORK\",\n                    \"wa_id\": \"5491123456789\"\n                }\n            ]\n        }\n    ]\n}"
+                },
+                "url": {
+                    "raw": "http://127.0.0.1:5000/v1/messages/contacts",
+                    "protocol": "http",
+                    "host": ["127.0.0.1"],
+                    "port": "5000",
+                    "path": ["v1", "messages", "contacts"]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Contacto Completo",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "X-API-Key",
+                        "value": "dev-api-key"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"to\": \"5491123456789\",\n    \"type\": \"contacts\",\n    \"contacts\": [\n        {\n            \"name\": {\n                \"formatted_name\": \"Maria Garcia\",\n                \"first_name\": \"Maria\",\n                \"last_name\": \"Garcia\",\n                \"middle_name\": \"Elena\",\n                \"suffix\": \"Ing.\",\n                \"prefix\": \"Dra.\"\n            },\n            \"phones\": [\n                {\n                    \"phone\": \"+5491123456789\",\n                    \"type\": \"WORK\",\n                    \"wa_id\": \"5491123456789\"\n                },\n                {\n                    \"phone\": \"+5491187654321\",\n                    \"type\": \"HOME\"\n                }\n            ],\n            \"emails\": [\n                {\n                    \"email\": \"maria.garcia@empresa.com\",\n                    \"type\": \"WORK\"\n                },\n                {\n                    \"email\": \"maria.personal@gmail.com\",\n                    \"type\": \"HOME\"\n                }\n            ],\n            \"org\": {\n                \"company\": \"Tech Solutions SA\",\n                \"department\": \"Desarrollo\",\n                \"title\": \"Arquitecta de Software\"\n            },\n            \"addresses\": [\n                {\n                    \"street\": \"Av. Corrientes 1234\",\n                    \"city\": \"Buenos Aires\",\n                    \"state\": \"CABA\",\n                    \"zip\": \"C1043AAZ\",\n                    \"country\": \"Argentina\",\n                    \"country_code\": \"AR\",\n                    \"type\": \"WORK\"\n                }\n            ],\n            \"urls\": [\n                {\n                    \"url\": \"https://www.techsolutions.com.ar\",\n                    \"type\": \"WORK\"\n                },\n                {\n                    \"url\": \"https://linkedin.com/in/mariagarcia\",\n                    \"type\": \"HOME\"\n                }\n            ]\n        }\n    ]\n}"
+                },
+                "url": {
+                    "raw": "http://127.0.0.1:5000/v1/messages/contacts",
+                    "protocol": "http",
+                    "host": ["127.0.0.1"],
+                    "port": "5000",
+                    "path": ["v1", "messages", "contacts"]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Múltiples Contactos (Equipo)",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "X-API-Key",
+                        "value": "dev-api-key"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"to\": \"5491123456789\",\n    \"type\": \"contacts\",\n    \"contacts\": [\n        {\n            \"name\": {\n                \"formatted_name\": \"Ana Lopez\",\n                \"first_name\": \"Ana\",\n                \"last_name\": \"Lopez\"\n            },\n            \"phones\": [\n                {\n                    \"phone\": \"+5491123456789\",\n                    \"type\": \"WORK\",\n                    \"wa_id\": \"5491123456789\"\n                }\n            ],\n            \"org\": {\n                \"company\": \"DevTeam SA\",\n                \"department\": \"Frontend\",\n                \"title\": \"Desarrolladora Senior\"\n            }\n        },\n        {\n            \"name\": {\n                \"formatted_name\": \"Carlos Rodriguez\",\n                \"first_name\": \"Carlos\",\n                \"last_name\": \"Rodriguez\"\n            },\n            \"phones\": [\n                {\n                    \"phone\": \"+5491187654321\",\n                    \"type\": \"WORK\",\n                    \"wa_id\": \"5491187654321\"\n                }\n            ],\n            \"org\": {\n                \"company\": \"DevTeam SA\",\n                \"department\": \"Backend\",\n                \"title\": \"Arquitecto de Software\"\n            }\n        },\n        {\n            \"name\": {\n                \"formatted_name\": \"Luis Martinez\",\n                \"first_name\": \"Luis\",\n                \"last_name\": \"Martinez\"\n            },\n            \"phones\": [\n                {\n                    \"phone\": \"+5491155443322\",\n                    \"type\": \"WORK\",\n                    \"wa_id\": \"5491155443322\"\n                }\n            ],\n            \"org\": {\n                \"company\": \"DevTeam SA\",\n                \"department\": \"DevOps\",\n                \"title\": \"Especialista en Infraestructura\"\n            }\n        }\n    ]\n}"
+                },
+                "url": {
+                    "raw": "http://127.0.0.1:5000/v1/messages/contacts",
+                    "protocol": "http",
+                    "host": ["127.0.0.1"],
+                    "port": "5000",
+                    "path": ["v1", "messages", "contacts"]
+                }
+            },
+            "response": []
+        },
+        {
+            "name": "Contacto Empresarial",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    },
+                    {
+                        "key": "X-API-Key",
+                        "value": "dev-api-key"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n    \"to\": \"5491123456789\",\n    \"type\": \"contacts\",\n    \"contacts\": [\n        {\n            \"name\": {\n                \"formatted_name\": \"TechCorp Solutions\",\n                \"first_name\": \"TechCorp\",\n                \"last_name\": \"Solutions\"\n            },\n            \"phones\": [\n                {\n                    \"phone\": \"+5411044445555\",\n                    \"type\": \"WORK\"\n                },\n                {\n                    \"phone\": \"+5411044446666\",\n                    \"type\": \"WORK\"\n                }\n            ],\n            \"emails\": [\n                {\n                    \"email\": \"contacto@techcorp.com.ar\",\n                    \"type\": \"WORK\"\n                },\n                {\n                    \"email\": \"ventas@techcorp.com.ar\",\n                    \"type\": \"WORK\"\n                }\n            ],\n            \"org\": {\n                \"company\": \"TechCorp Solutions SA\",\n                \"department\": \"Oficina Central\",\n                \"title\": \"Empresa de Desarrollo\"\n            },\n            \"addresses\": [\n                {\n                    \"street\": \"Av. Santa Fe 2020, Piso 15\",\n                    \"city\": \"Buenos Aires\",\n                    \"state\": \"CABA\",\n                    \"zip\": \"C1123AAB\",\n                    \"country\": \"Argentina\",\n                    \"country_code\": \"AR\",\n                    \"type\": \"WORK\"\n                }\n            ],\n            \"urls\": [\n                {\n                    \"url\": \"https://www.techcorp.com.ar\",\n                    \"type\": \"WORK\"\n                },\n                {\n                    \"url\": \"https://www.linkedin.com/company/techcorp\",\n                    \"type\": \"WORK\"\n                }\n            ]\n        }\n    ]\n}"
+                },
+                "url": {
+                    "raw": "http://127.0.0.1:5000/v1/messages/contacts",
+                    "protocol": "http",
+                    "host": ["127.0.0.1"],
+                    "port": "5000",
+                    "path": ["v1", "messages", "contacts"]
+                }
+            },
+            "response": []
+        }
+    ]
+}

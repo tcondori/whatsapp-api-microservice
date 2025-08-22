@@ -151,6 +151,85 @@ ERROR_RESPONSE_FIELDS = {
     )
 }
 
+# Definición de campos para mensaje de contactos (formato oficial Meta)
+CONTACTS_MESSAGE_FIELDS = {
+    'to': fields.String(
+        required=True,
+        description='Número de teléfono destino en formato internacional',
+        example='5491123456789'
+    ),
+    'type': fields.String(
+        required=True,
+        description='Tipo de mensaje',
+        enum=['contacts'],
+        default='contacts',
+        example='contacts'
+    ),
+    'contacts': fields.List(
+        fields.Raw(),
+        required=True,
+        description='Array de contactos según formato oficial WhatsApp Business API',
+        example=[
+            {
+                "name": {
+                    "formatted_name": "Juan Pérez",
+                    "first_name": "Juan",
+                    "last_name": "Pérez"
+                },
+                "phones": [
+                    {
+                        "phone": "+5491123456789",
+                        "type": "CELL",
+                        "wa_id": "5491123456789"
+                    }
+                ],
+                "emails": [
+                    {
+                        "email": "juan.perez@email.com",
+                        "type": "WORK"
+                    }
+                ]
+            }
+        ]
+    ),
+    'messaging_line_id': fields.Integer(
+        required=False,
+        description='ID de la línea de mensajería a utilizar',
+        example=1
+    )
+}
+
+# Definición de campos para mensaje de ubicación (formato oficial Meta)
+LOCATION_MESSAGE_FIELDS = {
+    'to': fields.String(
+        required=True,
+        description='Número de teléfono destino en formato internacional',
+        example='5491123456789'
+    ),
+    'type': fields.String(
+        required=True,
+        description='Tipo de mensaje',
+        enum=['location'],
+        default='location',
+        example='location'
+    ),
+    'location': fields.Raw(
+        required=True,
+        description='Datos de la ubicación según formato oficial WhatsApp Business API',
+        example={
+            'latitude': -34.6037,
+            'longitude': -58.3816,
+            'name': 'Obelisco de Buenos Aires',
+            'address': 'Av. 9 de Julio s/n, C1043 CABA, Argentina'
+        }
+    ),
+    'messaging_line_id': fields.Integer(
+        required=False,
+        description='ID de la línea de mensajería a utilizar',
+        example=1
+    )
+}
+
 # Definición de campos para respuesta de salud
 HEALTH_RESPONSE_FIELDS = {
     'status': fields.String(

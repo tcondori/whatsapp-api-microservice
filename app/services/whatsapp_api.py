@@ -185,6 +185,62 @@ class WhatsAppAPIService:
         
         return self._make_api_request('messages', 'POST', data, phone_number_id)
     
+    def send_contacts_message(self, phone_number: str, contacts_data: List[Dict[str, Any]], 
+                             phone_number_id: str) -> Dict[str, Any]:
+        """
+        Envía un mensaje de contactos vía WhatsApp API
+        Args:
+            phone_number: Número de destino
+            contacts_data: Array de contactos en formato oficial Meta
+            phone_number_id: ID del número de WhatsApp Business
+        Returns:
+            dict: Respuesta de WhatsApp API
+        """
+        data = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": phone_number,
+            "type": "contacts",
+            "contacts": contacts_data
+        }
+        
+        return self._make_api_request('messages', 'POST', data, phone_number_id)
+
+    def send_location_message(self, phone_number: str, latitude: float, longitude: float, 
+                             phone_number_id: str, name: str = None, address: str = None) -> Dict[str, Any]:
+        """
+        Envía un mensaje de ubicación vía WhatsApp API
+        Args:
+            phone_number: Número de destino
+            latitude: Latitud de la ubicación
+            longitude: Longitud de la ubicación
+            phone_number_id: ID del número de WhatsApp Business
+            name: Nombre del lugar (opcional)
+            address: Dirección del lugar (opcional)
+        Returns:
+            dict: Respuesta de WhatsApp API
+        """
+        location_data = {
+            "latitude": latitude,
+            "longitude": longitude
+        }
+        
+        # Agregar campos opcionales si se proporcionan
+        if name:
+            location_data["name"] = name
+        if address:
+            location_data["address"] = address
+        
+        data = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": phone_number,
+            "type": "location",
+            "location": location_data
+        }
+        
+        return self._make_api_request('messages', 'POST', data, phone_number_id)
+
     def send_template_message(self, phone_number: str, template_name: str, 
                              language_code: str, phone_number_id: str,
                              parameters: List[Dict] = None) -> Dict[str, Any]:

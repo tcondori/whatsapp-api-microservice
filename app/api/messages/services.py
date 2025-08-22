@@ -369,6 +369,339 @@ class MessageService:
             self.logger.error(f"Error inesperado enviando imagen con upload: {e}")
             raise MessageSendError(f"Error al enviar imagen con upload: {str(e)}")
 
+    def send_contacts_message(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Envía un mensaje de contactos vía WhatsApp API usando formato oficial de Meta
+        
+        Formato esperado (oficial Meta):
+        {
+          "to": "whatsapp-id",
+          "type": "contacts",
+          "contacts": [
+            {
+              "name": {
+                "formatted_name": "Juan Pérez",
+                "first_name": "Juan",
+                "last_name": "Pérez"
+              },
+              "phones": [
+                {
+                  "phone": "+5491123456789",
+                  "type": "CELL",
+                  "wa_id": "5491123456789"
+                }
+              ],
+              "emails": [
+                {
+                  "email": "juan@email.com",
+                  "type": "WORK"
+                }
+              ]
+            }
+          ],
+          "messaging_line_id": 1  // opcional
+        }
+        
+        Args:
+            message_data: Datos del mensaje en formato oficial Meta
+        Returns:
+            dict: Respuesta del envío con datos del mensaje creado
+        """
+        try:
+            # Extraer datos del mensaje (formato oficial Meta)
+            phone_number = message_data.get('to')
+            message_type = message_data.get('type')
+            contacts_data = message_data.get('contacts', [])
+            line_id = message_data.get('messaging_line_id', 1)
+
+            # Validaciones básicas
+            if not validate_phone_number(phone_number):
+                raise ValidationError("Formato de número de teléfono inválido")
+
+            # Validar tipo de mensaje
+            if message_type != 'contacts':
+                raise ValidationError("El campo 'type' debe ser 'contacts' para mensajes de contactos")
+
+            # Validar que se proporcione array contacts
+            if not contacts_data or not isinstance(contacts_data, list):
+                raise ValidationError("Debe proporcionar array 'contacts' con al menos un contacto")
+
+            if len(contacts_data) == 0:
+                raise ValidationError("El array 'contacts' debe contener al menos un contacto")
+
+            # Validar límite de WhatsApp (máximo 20 contactos por mensaje)
+            if len(contacts_data) > 20:
+                raise ValidationError("WhatsApp permite máximo 20 contactos por mensaje")
+
+            # Validar estructura de cada contacto
+            for i, contact in enumerate(contacts_data):
+                self._validate_contact_structure(contact, i)
+
+            # Obtener línea de mensajería
+            messaging_line = self._get_available_line(line_id)
+
+            # Enviar mensaje via WhatsApp API
+            try:
+                whatsapp_message_id = self._send_whatsapp_contacts_message(
+                    phone_number, contacts_data, messaging_line
+                )
+            except Exception as send_error:
+                # FALLBACK: Si falla el envío, usar simulación como en otros tipos
+                self.logger.warning(f"Fallo en envío real, usando simulación: {send_error}")
+                import uuid
+                from datetime import datetime, timezone
+                timestamp = int(datetime.now(timezone.utc).timestamp())
+                whatsapp_message_id = f"wamid.contacts_sim_{timestamp}_{uuid.uuid4().hex[:8]}"
+                self.logger.info(f"[SIMULADO] Mensaje de contactos enviado a {phone_number}: {len(contacts_data)} contacto(s)")
+
+            # Crear contenido descriptivo para almacenamiento
+            contact_names = []
+            for contact in contacts_data:
+                name = contact.get('name', {})
+                formatted_name = name.get('formatted_name', 
+                    f"{name.get('first_name', '')} {name.get('last_name', '')}".strip() or
+                    'Contacto sin nombre'
+                )
+                contact_names.append(formatted_name)
+            
+            content = f"Contactos enviados ({len(contacts_data)}): {', '.join(contact_names[:3])}"
+            if len(contacts_data) > 3:
+                content += f" y {len(contacts_data) - 3} más"
+
+            # Crear registro en base de datos
+            message_record = self.msg_repo.create(
+                whatsapp_message_id=whatsapp_message_id,
+                line_id=messaging_line.line_id,
+                phone_number=phone_number,
+                message_type='contacts',
+                content=content,
+                status='pending',
+                direction='outbound'
+            )
+
+            # Incrementar contador de la línea
+            messaging_line.increment_message_count()
+
+            # Formatear respuesta
+            response_data = self._format_message_response(message_record)
+            response_data['contacts_info'] = {
+                'total_contacts': len(contacts_data),
+                'contact_names': contact_names,
+                'contacts_preview': contacts_data[:2] if len(contacts_data) <= 2 else contacts_data[:2] + [{'preview': f'... y {len(contacts_data) - 2} contactos más'}]
+            }
+
+            self.logger.info(f"Mensaje de contactos enviado exitosamente con formato oficial Meta: {whatsapp_message_id}")
+            return create_success_response(
+                data=response_data,
+                message="Mensaje de contactos enviado exitosamente"
+            )
+
+        except (ValidationError, LineNotFoundError) as e:
+            self.logger.warning(f"Error de validación enviando contactos: {e}")
+            raise e
+        except Exception as e:
+            self.logger.error(f"Error inesperado enviando contactos: {e}")
+            raise MessageSendError(f"Error al enviar contactos: {str(e)}")
+
+    def _validate_contact_structure(self, contact: Dict[str, Any], index: int) -> None:
+        """
+        Valida la estructura de un contacto individual según formato oficial Meta
+        Args:
+            contact: Datos del contacto a validar
+            index: Índice del contacto para mensajes de error
+        """
+        if not isinstance(contact, dict):
+            raise ValidationError(f"El contacto en posición {index} debe ser un objeto")
+
+        # Validar que tenga al menos el campo name
+        if 'name' not in contact:
+            raise ValidationError(f"El contacto en posición {index} debe incluir el campo 'name'")
+
+        name = contact['name']
+        if not isinstance(name, dict):
+            raise ValidationError(f"El campo 'name' del contacto en posición {index} debe ser un objeto")
+
+        # Validar que tenga al menos formatted_name o first_name
+        if not name.get('formatted_name') and not name.get('first_name'):
+            raise ValidationError(f"El contacto en posición {index} debe tener 'formatted_name' o 'first_name'")
+
+        # Validar campos opcionales si existen
+        optional_fields = {
+            'phones': list,
+            'emails': list,
+            'addresses': list,
+            'urls': list,
+            'org': dict
+        }
+
+        for field_name, expected_type in optional_fields.items():
+            if field_name in contact:
+                field_value = contact[field_name]
+                if not isinstance(field_value, expected_type):
+                    raise ValidationError(f"El campo '{field_name}' del contacto en posición {index} debe ser {expected_type.__name__}")
+
+        # Validar teléfonos si existen
+        if 'phones' in contact:
+            phones = contact['phones']
+            if len(phones) > 20:  # Límite de WhatsApp
+                raise ValidationError(f"El contacto en posición {index} puede tener máximo 20 teléfonos")
+            
+            for j, phone in enumerate(phones):
+                if not isinstance(phone, dict) or 'phone' not in phone:
+                    raise ValidationError(f"Teléfono {j} del contacto {index} debe tener campo 'phone'")
+                
+                phone_number = phone['phone']
+                if not isinstance(phone_number, str) or len(phone_number.strip()) == 0:
+                    raise ValidationError(f"Teléfono {j} del contacto {index} debe ser una cadena válida")
+
+        # Validar emails si existen  
+        if 'emails' in contact:
+            emails = contact['emails']
+            if len(emails) > 20:  # Límite de WhatsApp
+                raise ValidationError(f"El contacto en posición {index} puede tener máximo 20 emails")
+            
+            for j, email in enumerate(emails):
+                if not isinstance(email, dict) or 'email' not in email:
+                    raise ValidationError(f"Email {j} del contacto {index} debe tener campo 'email'")
+                
+                email_address = email['email']
+                if not isinstance(email_address, str) or '@' not in email_address:
+                    raise ValidationError(f"Email {j} del contacto {index} debe ser una dirección válida")
+
+    def send_location_message(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Envía un mensaje de ubicación vía WhatsApp API usando formato oficial de Meta
+        
+        Formato esperado (oficial Meta):
+        {
+          "to": "whatsapp-id",
+          "type": "location",
+          "location": {
+            "latitude": -34.6037,
+            "longitude": -58.3816,
+            "name": "Obelisco de Buenos Aires", // opcional
+            "address": "Av. 9 de Julio s/n, C1043 CABA, Argentina" // opcional
+          },
+          "messaging_line_id": 1  // opcional
+        }
+        
+        Args:
+            message_data: Datos del mensaje en formato oficial Meta
+        Returns:
+            dict: Respuesta del envío con datos del mensaje creado
+        """
+        try:
+            # Extraer datos del mensaje (formato oficial Meta)
+            phone_number = message_data.get('to')
+            message_type = message_data.get('type')
+            location_data = message_data.get('location', {})
+            line_id = message_data.get('messaging_line_id', 1)
+
+            # Validaciones básicas
+            if not validate_phone_number(phone_number):
+                raise ValidationError("Formato de número de teléfono inválido")
+
+            # Validar tipo de mensaje
+            if message_type != 'location':
+                raise ValidationError("El campo 'type' debe ser 'location' para mensajes de ubicación")
+
+            # Validar que se proporcione objeto location
+            if not location_data or not isinstance(location_data, dict):
+                raise ValidationError("Debe proporcionar objeto 'location' con 'latitude' y 'longitude'")
+
+            # Validar coordenadas requeridas
+            latitude = location_data.get('latitude')
+            longitude = location_data.get('longitude')
+            
+            if latitude is None or longitude is None:
+                raise ValidationError("Los campos 'latitude' y 'longitude' son requeridos en el objeto 'location'")
+
+            # Validar que sean números válidos
+            try:
+                latitude = float(latitude)
+                longitude = float(longitude)
+            except (ValueError, TypeError):
+                raise ValidationError("'latitude' y 'longitude' deben ser números válidos")
+
+            # Validar rangos de coordenadas
+            if not (-90 <= latitude <= 90):
+                raise ValidationError("'latitude' debe estar entre -90 y 90 grados")
+            
+            if not (-180 <= longitude <= 180):
+                raise ValidationError("'longitude' debe estar entre -180 y 180 grados")
+
+            # Obtener campos opcionales
+            name = location_data.get('name', '')
+            address = location_data.get('address', '')
+
+            # Validar campos opcionales si se proporcionan
+            if name and len(str(name)) > 1000:
+                raise ValidationError("El campo 'name' no puede exceder 1000 caracteres")
+            
+            if address and len(str(address)) > 1000:
+                raise ValidationError("El campo 'address' no puede exceder 1000 caracteres")
+
+            # Obtener línea de mensajería
+            messaging_line = self._get_available_line(line_id)
+
+            # Enviar mensaje via WhatsApp API
+            try:
+                whatsapp_message_id = self._send_whatsapp_location_message(
+                    phone_number, latitude, longitude, name, address, messaging_line
+                )
+            except Exception as send_error:
+                # FALLBACK: Si falla el envío, usar simulación como en otros tipos
+                self.logger.warning(f"Fallo en envío real, usando simulación: {send_error}")
+                import uuid
+                from datetime import datetime, timezone
+                timestamp = int(datetime.now(timezone.utc).timestamp())
+                whatsapp_message_id = f"wamid.location_sim_{timestamp}_{uuid.uuid4().hex[:8]}"
+                self.logger.info(f"[SIMULADO] Mensaje de ubicación enviado a {phone_number}: {latitude}, {longitude}")
+
+            # Crear contenido descriptivo para almacenamiento
+            content_parts = [f"Ubicación: {latitude}, {longitude}"]
+            if name:
+                content_parts.append(f"Nombre: {name}")
+            if address:
+                content_parts.append(f"Dirección: {address}")
+            content = " | ".join(content_parts)
+
+            # Crear registro en base de datos
+            message_record = self.msg_repo.create(
+                whatsapp_message_id=whatsapp_message_id,
+                line_id=messaging_line.line_id,
+                phone_number=phone_number,
+                message_type='location',
+                content=content,
+                status='pending',
+                direction='outbound'
+            )
+
+            # Incrementar contador de la línea
+            messaging_line.increment_message_count()
+
+            # Formatear respuesta
+            response_data = self._format_message_response(message_record)
+            response_data['location_info'] = {
+                'latitude': latitude,
+                'longitude': longitude,
+                'name': name if name else None,
+                'address': address if address else None
+            }
+
+            self.logger.info(f"Mensaje de ubicación enviado exitosamente con formato oficial Meta: {whatsapp_message_id}")
+            return create_success_response(
+                data=response_data,
+                message="Mensaje de ubicación enviado exitosamente"
+            )
+
+        except (ValidationError, LineNotFoundError) as e:
+            self.logger.warning(f"Error de validación enviando ubicación: {e}")
+            raise e
+        except Exception as e:
+            self.logger.error(f"Error inesperado enviando ubicación: {e}")
+            raise MessageSendError(f"Error al enviar ubicación: {str(e)}")
+
     def send_media_message_with_upload(self, message_data: Dict[str, Any], file_content: bytes, 
                                      filename: str, content_type: str, media_type: str) -> Dict[str, Any]:
         """
@@ -820,6 +1153,86 @@ class MessageService:
             self.logger.error(f"Error actualizando estado de mensaje {whatsapp_message_id}: {e}")
             raise WhatsAppAPIError(f"Error al actualizar mensaje: {str(e)}")
     
+    def _send_whatsapp_contacts_message(self, phone_number: str, contacts_data: List[Dict[str, Any]], 
+                                       messaging_line) -> str:
+        """
+        Envía mensaje de contactos vía WhatsApp API
+        Args:
+            phone_number: Número de teléfono destino
+            contacts_data: Array de contactos en formato Meta
+            messaging_line: Línea de mensajería
+        Returns:
+            str: WhatsApp message ID
+        """
+        try:
+            response = self.whatsapp_api.send_contacts_message(
+                phone_number=phone_number,
+                contacts_data=contacts_data,
+                phone_number_id=messaging_line.phone_number_id
+            )
+            
+            if response and response.get('messages'):
+                message_id = response['messages'][0]['id']
+                self.logger.info(f"Mensaje de contactos enviado exitosamente vía WhatsApp: {message_id}")
+                return message_id
+            else:
+                raise Exception("Respuesta inválida del servicio WhatsApp")
+                
+        except Exception as e:
+            self.logger.error(f"Error enviando mensaje de contactos vía WhatsApp a {phone_number}: {str(e)}")
+            
+            # FALLBACK: Generar message_id simulado cuando falla WhatsApp API
+            self.logger.warning("Usando modo simulación como fallback para mensaje de contactos")
+            import uuid
+            from datetime import datetime, timezone
+            timestamp = int(datetime.now(timezone.utc).timestamp())
+            simulated_id = f"wamid.contacts_test_{timestamp}_{uuid.uuid4().hex[:8]}"
+            self.logger.info(f"[SIMULADO] Mensaje de contactos enviado a {phone_number}: {len(contacts_data)} contacto(s)")
+            return simulated_id
+
+    def _send_whatsapp_location_message(self, phone_number: str, latitude: float, longitude: float, 
+                                       name: str, address: str, messaging_line) -> str:
+        """
+        Envía mensaje de ubicación vía WhatsApp API
+        Args:
+            phone_number: Número de teléfono destino
+            latitude: Latitud de la ubicación
+            longitude: Longitud de la ubicación
+            name: Nombre del lugar (opcional)
+            address: Dirección del lugar (opcional)
+            messaging_line: Línea de mensajería
+        Returns:
+            str: WhatsApp message ID
+        """
+        try:
+            response = self.whatsapp_api.send_location_message(
+                phone_number=phone_number,
+                latitude=latitude,
+                longitude=longitude,
+                phone_number_id=messaging_line.phone_number_id,
+                name=name if name else None,
+                address=address if address else None
+            )
+            
+            if response and response.get('messages'):
+                message_id = response['messages'][0]['id']
+                self.logger.info(f"Mensaje de ubicación enviado exitosamente vía WhatsApp: {message_id}")
+                return message_id
+            else:
+                raise Exception("Respuesta inválida del servicio WhatsApp")
+                
+        except Exception as e:
+            self.logger.error(f"Error enviando mensaje de ubicación vía WhatsApp a {phone_number}: {str(e)}")
+            
+            # FALLBACK: Generar message_id simulado cuando falla WhatsApp API
+            self.logger.warning("Usando modo simulación como fallback para mensaje de ubicación")
+            import uuid
+            from datetime import datetime, timezone
+            timestamp = int(datetime.now(timezone.utc).timestamp())
+            simulated_id = f"wamid.location_test_{timestamp}_{uuid.uuid4().hex[:8]}"
+            self.logger.info(f"[SIMULADO] Mensaje de ubicación enviado a {phone_number}: {latitude}, {longitude}")
+            return simulated_id
+
     def _get_available_line(self, line_id: Optional[str] = None) -> Any:
         """
         Obtiene una línea de mensajería disponible

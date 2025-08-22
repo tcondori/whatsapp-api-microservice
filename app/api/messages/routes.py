@@ -14,7 +14,8 @@ from app.utils.helpers import create_error_response
 from app.api.messages.models import (
     TEXT_MESSAGE_FIELDS, MESSAGE_RESPONSE_FIELDS, UPDATE_STATUS_FIELDS,
     ERROR_RESPONSE_FIELDS, HEALTH_RESPONSE_FIELDS, IMAGE_MESSAGE_FIELDS, 
-    IMAGE_UPLOAD_MESSAGE_FIELDS, MEDIA_UPLOAD_MESSAGE_FIELDS
+    IMAGE_UPLOAD_MESSAGE_FIELDS, MEDIA_UPLOAD_MESSAGE_FIELDS, LOCATION_MESSAGE_FIELDS,
+    CONTACTS_MESSAGE_FIELDS
 )
 
 # Crear namespace para mensajes
@@ -27,6 +28,8 @@ messages_ns = Namespace(
 # Definir modelos usando el namespace
 text_message_request = messages_ns.model('TextMessageRequest', TEXT_MESSAGE_FIELDS)
 image_message_request = messages_ns.model('ImageMessageRequest', IMAGE_MESSAGE_FIELDS)
+location_message_request = messages_ns.model('LocationMessageRequest', LOCATION_MESSAGE_FIELDS)
+contacts_message_request = messages_ns.model('ContactsMessageRequest', CONTACTS_MESSAGE_FIELDS)
 image_upload_message_request = messages_ns.model('ImageUploadMessageRequest', IMAGE_UPLOAD_MESSAGE_FIELDS)
 media_upload_message_request = messages_ns.model('MediaUploadMessageRequest', MEDIA_UPLOAD_MESSAGE_FIELDS)
 message_response = messages_ns.model('MessageResponse', MESSAGE_RESPONSE_FIELDS)
@@ -143,6 +146,251 @@ class ImageMessageResource(Resource):
             
             # Enviar mensaje usando el servicio
             result = message_service.send_image_message(message_data)
+            
+            # Devolver respuesta exitosa
+            return result
+            
+        except ValidationError as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="VALIDATION_ERROR"
+            )
+        except (MessageSendError, LineNotFoundError) as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="MESSAGE_SEND_ERROR"
+            )
+        except Exception as e:
+            messages_ns.abort(500,
+                message="Error interno del servidor",
+                error_code="INTERNAL_ERROR",
+                details=str(e)
+            )
+
+@messages_ns.route('/location')
+class LocationMessageResource(Resource):
+    """
+    Endpoint para envío de mensajes de ubicación
+    """
+    
+    @messages_ns.doc('send_location_message', security='ApiKeyAuth')
+    @messages_ns.expect(location_message_request, validate=True)
+    @messages_ns.response(200, 'Mensaje de ubicación enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @require_api_key
+    def post(self):
+        """
+        Envía un mensaje de ubicación a través de WhatsApp
+        
+        Envía una ubicación geográfica a un número de teléfono específico usando
+        coordenadas de latitud y longitud. Opcionalmente puede incluir el nombre
+        del lugar y la dirección.
+        
+        **Formato del mensaje (oficial Meta/WhatsApp):**
+        ```json
+        {
+            "to": "5491123456789",
+            "type": "location",
+            "location": {
+                "latitude": -34.6037,
+                "longitude": -58.3816,
+                "name": "Obelisco de Buenos Aires",
+                "address": "Av. 9 de Julio s/n, C1043 CABA, Argentina"
+            },
+            "messaging_line_id": 1
+        }
+        ```
+        
+        **Campos requeridos:**
+        - `to`: Número de teléfono destino en formato internacional
+        - `type`: Debe ser "location"
+        - `location.latitude`: Latitud (entre -90 y 90)
+        - `location.longitude`: Longitud (entre -180 y 180)
+        
+        **Campos opcionales:**
+        - `location.name`: Nombre descriptivo del lugar
+        - `location.address`: Dirección completa del lugar
+        - `messaging_line_id`: ID de la línea de mensajería (default: 1)
+        
+        **Ejemplo de uso:**
+        ```bash
+        curl -X POST "http://localhost:5000/v1/messages/location" \
+             -H "X-API-Key: dev-api-key" \
+             -H "Content-Type: application/json" \
+             -d '{
+               "to": "5491123456789",
+               "type": "location", 
+               "location": {
+                 "latitude": -34.6037,
+                 "longitude": -58.3816,
+                 "name": "Obelisco",
+                 "address": "Buenos Aires, Argentina"
+               }
+             }'
+        ```
+        """
+        try:
+            # Obtener datos del request
+            message_data = request.json
+            
+            # Validar datos requeridos
+            if not message_data:
+                messages_ns.abort(400, 
+                    message="Datos del mensaje requeridos",
+                    error_code="MISSING_DATA"
+                )
+            
+            # Enviar mensaje usando el servicio
+            result = message_service.send_location_message(message_data)
+            
+            # Devolver respuesta exitosa
+            return result
+            
+        except ValidationError as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="VALIDATION_ERROR"
+            )
+        except (MessageSendError, LineNotFoundError) as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="MESSAGE_SEND_ERROR"
+            )
+        except Exception as e:
+            messages_ns.abort(500,
+                message="Error interno del servidor",
+                error_code="INTERNAL_ERROR",
+                details=str(e)
+            )
+
+@messages_ns.route('/contacts')
+class ContactsMessageResource(Resource):
+    """
+    Endpoint para envío de mensajes de contactos (vCard)
+    """
+    
+    @messages_ns.doc('send_contacts_message', security='ApiKeyAuth')
+    @messages_ns.expect(contacts_message_request, validate=True)
+    @messages_ns.response(200, 'Mensaje de contactos enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @require_api_key
+    def post(self):
+        """
+        Envía un mensaje de contactos (vCard enriquecida) a través de WhatsApp
+        
+        Permite enviar una o más tarjetas de contacto con información completa
+        como nombre, teléfonos, emails, direcciones, organización, etc.
+        
+        **Formato del mensaje (oficial Meta/WhatsApp):**
+        ```json
+        {
+            "to": "5491123456789",
+            "type": "contacts",
+            "contacts": [
+                {
+                    "name": {
+                        "formatted_name": "Juan Pérez",
+                        "first_name": "Juan",
+                        "last_name": "Pérez"
+                    },
+                    "phones": [
+                        {
+                            "phone": "+5491123456789",
+                            "type": "CELL",
+                            "wa_id": "5491123456789"
+                        }
+                    ],
+                    "emails": [
+                        {
+                            "email": "juan.perez@empresa.com",
+                            "type": "WORK"
+                        }
+                    ],
+                    "org": {
+                        "company": "Mi Empresa",
+                        "department": "Ventas",
+                        "title": "Gerente de Ventas"
+                    },
+                    "addresses": [
+                        {
+                            "street": "Av. Corrientes 1234",
+                            "city": "Buenos Aires",
+                            "state": "CABA",
+                            "zip": "C1043",
+                            "country": "Argentina",
+                            "country_code": "AR",
+                            "type": "WORK"
+                        }
+                    ]
+                }
+            ],
+            "messaging_line_id": 1
+        }
+        ```
+        
+        **Campos requeridos:**
+        - `to`: Número de teléfono destino en formato internacional
+        - `type`: Debe ser "contacts"
+        - `contacts`: Array con al menos 1 contacto (máximo 20)
+        - `contacts[].name`: Objeto con información del nombre
+        - `contacts[].name.formatted_name` o `contacts[].name.first_name`: Al menos uno requerido
+        
+        **Campos opcionales del contacto:**
+        - `phones`: Array de teléfonos (máximo 20 por contacto)
+        - `emails`: Array de emails (máximo 20 por contacto) 
+        - `addresses`: Array de direcciones
+        - `urls`: Array de URLs/sitios web
+        - `org`: Información de organización (empresa, cargo, departamento)
+        - `birthday`: Fecha de nacimiento (formato YYYY-MM-DD)
+        - `messaging_line_id`: ID de la línea de mensajería (default: 1)
+        
+        **Tipos de teléfono/email/dirección:**
+        - `CELL`, `MAIN`, `IPHONE`, `HOME`, `WORK`
+        
+        **Ejemplo de uso:**
+        ```bash
+        curl -X POST "http://localhost:5000/v1/messages/contacts" \
+             -H "X-API-Key: dev-api-key" \
+             -H "Content-Type: application/json" \
+             -d '{
+               "to": "5491123456789",
+               "type": "contacts",
+               "contacts": [{
+                 "name": {
+                   "formatted_name": "Juan Pérez",
+                   "first_name": "Juan",
+                   "last_name": "Pérez"
+                 },
+                 "phones": [{
+                   "phone": "+5491123456789",
+                   "type": "CELL",
+                   "wa_id": "5491123456789"
+                 }],
+                 "emails": [{
+                   "email": "juan@empresa.com",
+                   "type": "WORK"
+                 }]
+               }]
+             }'
+        ```
+        """
+        try:
+            # Obtener datos del request
+            message_data = request.json
+            
+            # Validar datos requeridos
+            if not message_data:
+                messages_ns.abort(400, 
+                    message="Datos del mensaje requeridos",
+                    error_code="MISSING_DATA"
+                )
+            
+            # Enviar mensaje usando el servicio
+            result = message_service.send_contacts_message(message_data)
             
             # Devolver respuesta exitosa
             return result
@@ -281,7 +529,6 @@ class VideoUploadResource(Resource):
     """
     
     @messages_ns.doc('send_video_with_upload', security='ApiKeyAuth')
-    @messages_ns.expect(media_upload_message_request, validate=False)
     @messages_ns.response(200, 'Mensaje de video con upload enviado exitosamente', message_response)
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
@@ -291,13 +538,47 @@ class VideoUploadResource(Resource):
         """
         Sube un archivo de video y envía mensaje con media_id
         
-        Formato multipart/form-data:
-        - file: archivo de video (MP4/3GPP)
-        - to: número de teléfono destino
-        - type: 'video'
-        - caption: texto opcional
-        - messaging_line_id: ID de línea (opcional)
+        ⚠️ **IMPORTANTE: Este endpoint requiere multipart/form-data, NO JSON**
+        
+        **Proceso:**
+        1. Sube el video a servidores de WhatsApp
+        2. Obtiene un media_id único
+        3. Envía el mensaje usando el media_id
+        4. Registra la operación en base de datos
+        
+        **Content-Type requerido:** multipart/form-data
+        
+        **Parámetros del formulario:**
+        - `file` (archivo, obligatorio): Archivo de video (MP4, 3GPP)
+        - `to` (string, obligatorio): Número de teléfono destino (ej: 5491123456789)
+        - `type` (string, opcional): Tipo de mensaje, se establece automáticamente como 'video'
+        - `caption` (string, opcional): Texto descriptivo del video
+        - `messaging_line_id` (integer, opcional): ID de línea de mensajería (default: 1)
+        
+        **Especificaciones técnicas:**
+        - Tamaño máximo: 16MB
+        - Formatos: MP4, 3GPP
+        - Duración máxima: 6 minutos
+        - Resolución recomendada: hasta 1280x720
+        
+        **Ejemplo en Postman:**
+        ```
+        POST http://localhost:5000/v1/messages/video/upload
+        Headers:
+            X-API-Key: dev-api-key
+            Content-Type: multipart/form-data
+        
+        Body (form-data):
+            file: [seleccionar archivo video.mp4]
+            to: 5491123456789
+            type: video
+            caption: Mi video de prueba
+            messaging_line_id: 1
+        ```
+        
+        **NOTA:** NO usar application/json - debe ser multipart/form-data
         """
+        
         return self._handle_media_upload('video', ['video/mp4', 'video/3gpp'])
     
     def _handle_media_upload(self, media_type: str, allowed_content_types: list):
@@ -475,7 +756,7 @@ class MessageListResource(Resource):
     @messages_ns.param('per_page', 'Elementos por página', type='integer', default=10)
     @messages_ns.param('phone_number', 'Filtrar por número de teléfono')
     @messages_ns.param('status', 'Filtrar por estado', enum=['pending', 'sent', 'delivered', 'read', 'failed'])
-    @messages_ns.param('message_type', 'Filtrar por tipo', enum=['text', 'image', 'document', 'audio', 'video'])
+    @messages_ns.param('message_type', 'Filtrar por tipo', enum=['text', 'image', 'location', 'contacts', 'document', 'audio', 'video'])
     @messages_ns.param('direction', 'Filtrar por dirección', enum=['inbound', 'outbound'])
     @messages_ns.param('line_id', 'Filtrar por línea de mensajería')
     @messages_ns.response(200, 'Lista de mensajes obtenida exitosamente', message_list_response)
@@ -719,6 +1000,8 @@ class MessageTestResource(Resource):
                     'supported_endpoints': [
                         'POST /v1/messages/text - Enviar mensaje de texto',
                         'POST /v1/messages/image - Enviar mensaje de imagen (URL directa o media_id)',
+                        'POST /v1/messages/location - Enviar mensaje de ubicación',
+                        'POST /v1/messages/contacts - Enviar mensaje de contactos (vCard)',
                         'POST /v1/messages/image/upload - Subir archivo y enviar imagen (Caso 2: media_id)',
                         'POST /v1/messages/video/upload - Subir archivo y enviar video',
                         'POST /v1/messages/audio/upload - Subir archivo y enviar audio',
