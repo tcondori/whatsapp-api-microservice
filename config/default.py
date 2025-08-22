@@ -36,6 +36,8 @@ class DefaultConfig:
     
     # Configuración de Webhooks
     WEBHOOK_VERIFY_TOKEN = os.getenv('WEBHOOK_VERIFY_TOKEN')
+    FACEBOOK_APP_SECRET = os.getenv('FACEBOOK_APP_SECRET')
+    # Mantener por compatibilidad, pero ahora usar FACEBOOK_APP_SECRET
     WEBHOOK_SECRET = os.getenv('WEBHOOK_SECRET')
     
     # Configuración de SQLAlchemy

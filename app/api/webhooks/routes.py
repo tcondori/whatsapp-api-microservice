@@ -2,7 +2,7 @@
 Endpoints de webhooks de WhatsApp
 Maneja la recepción y procesamiento de webhooks de WhatsApp Business API
 """
-from flask import request, jsonify
+from flask import request, jsonify, Response
 from flask_restx import Resource, Namespace
 import logging
 
@@ -42,7 +42,9 @@ class WebhookEndpoint(Resource):
             # Verificar modo y token
             if mode == 'subscribe' and token == whatsapp_api.config.WEBHOOK_VERIFY_TOKEN:
                 logger.info("Verificación de webhook exitosa")
-                return challenge, 200
+                # Meta requiere respuesta en texto plano, no JSON
+                from flask import Response
+                return Response(challenge, status=200, mimetype='text/plain')
             else:
                 logger.warning(f"Verificación de webhook fallida: mode={mode}, token válido={token == whatsapp_api.config.WEBHOOK_VERIFY_TOKEN}")
                 return {'error': 'Forbidden'}, 403
@@ -111,7 +113,7 @@ class WebhookHealthCheck(Resource):
                 'webhook_processor': 'active',
                 'whatsapp_api_service': 'active',
                 'webhook_verify_token_configured': bool(whatsapp_api.config.WEBHOOK_VERIFY_TOKEN),
-                'webhook_secret_configured': bool(whatsapp_api.config.WEBHOOK_SECRET),
+                'facebook_app_secret_configured': bool(getattr(whatsapp_api.config, 'FACEBOOK_APP_SECRET', None)),
                 'access_token_configured': bool(whatsapp_api.config.WHATSAPP_ACCESS_TOKEN),
                 'timestamp': webhook_processor.logger.handlers[0].format(
                     webhook_processor.logger.makeRecord(

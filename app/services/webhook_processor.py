@@ -148,9 +148,16 @@ class WebhookProcessor:
             timestamp = message.get('timestamp')
             message_type = message.get('type')
             
-            # Verificar si ya procesamos este mensaje
+            # Verificar si ya procesamos este mensaje (en memoria)
             if message_id in self._processed_messages:
-                self.logger.info(f"Mensaje {message_id} ya procesado, saltando")
+                self.logger.info(f"Mensaje {message_id} ya procesado en memoria, saltando")
+                return
+            
+            # Verificar si el mensaje ya existe en la base de datos
+            existing_message = self.msg_repo.get_by_whatsapp_id(message_id)
+            if existing_message:
+                self.logger.info(f"Mensaje {message_id} ya existe en BD, saltando")
+                self._processed_messages.add(message_id)
                 return
             
             # Extraer contenido del mensaje
@@ -164,28 +171,66 @@ class WebhookProcessor:
                 line = self._create_default_line(phone_number_id, display_name)
             
             # Guardar mensaje en base de datos
-            message_record = self.msg_repo.create(
-                whatsapp_message_id=message_id,
-                line_id=line.line_id,
-                phone_number=from_number,
-                message_type=message_type,
-                content=content,
-                status='received',
-                direction='inbound',
-                timestamp=datetime.fromtimestamp(int(timestamp), timezone.utc) if timestamp else None
-            )
+            try:
+                # Preparar datos del mensaje
+                message_data = {
+                    'whatsapp_message_id': message_id,
+                    'line_id': line.line_id,
+                    'phone_number': from_number,
+                    'message_type': message_type,
+                    'content': content,
+                    'status': 'received',
+                    'direction': 'inbound'
+                }
+                
+                # Si tenemos timestamp del webhook, incluirlo en los datos de creación
+                if timestamp:
+                    try:
+                        message_data['created_at'] = datetime.fromtimestamp(int(timestamp), timezone.utc)
+                        message_data['updated_at'] = datetime.fromtimestamp(int(timestamp), timezone.utc)
+                    except (ValueError, OSError) as e:
+                        self.logger.warning(f"No se pudo convertir timestamp {timestamp}: {e}")
+                
+                # Crear mensaje con todos los datos
+                message_record = self.msg_repo.create(**message_data)
+                        
+            except Exception as e:
+                # Si hay error de duplicado, verificar si el mensaje existe
+                if "UNIQUE constraint failed" in str(e) or "duplicate key" in str(e):
+                    self.logger.warning(f"Mensaje duplicado detectado para {message_id}, verificando existencia")
+                    existing_message = self.msg_repo.get_by_whatsapp_id(message_id)
+                    if existing_message:
+                        self.logger.info(f"Mensaje {message_id} confirmado como duplicado, usando existente")
+                        # No usar el objeto existing_message directamente para evitar conflictos de sesión
+                        message_record = None  # Marcamos que ya existe sin usar el objeto
+                        self._processed_messages.add(message_id)
+                    else:
+                        self.logger.error(f"Error inesperado creando mensaje {message_id}: {e}")
+                        raise e
+                elif "already attached to session" in str(e):
+                    self.logger.warning(f"Conflicto de sesión SQLAlchemy para mensaje {message_id}, ignorando")
+                    # También es un indicador de que el mensaje ya existe
+                    message_record = None
+                    self._processed_messages.add(message_id)
+                else:
+                    self.logger.error(f"Error creando mensaje {message_id}: {e}")
+                    raise e
             
             # Marcar como procesado
             self._processed_messages.add(message_id)
             
-            # Marcar mensaje como leído
-            try:
-                self.whatsapp_api.mark_message_as_read(message_id, phone_number_id)
-            except Exception as e:
-                self.logger.warning(f"No se pudo marcar mensaje como leído: {e}")
-            
-            # Procesar lógica de negocio (respuestas automáticas, etc.)
-            self._handle_business_logic(message_record, message)
+            # Solo continuar con el procesamiento si tenemos un message_record válido
+            if message_record is not None:
+                # Marcar mensaje como leído
+                try:
+                    self.whatsapp_api.mark_message_as_read(message_id, phone_number_id)
+                except Exception as e:
+                    self.logger.warning(f"No se pudo marcar mensaje como leído: {e}")
+                
+                # Procesar lógica de negocio (respuestas automáticas, etc.)
+                self._handle_business_logic(message_record, message)
+            else:
+                self.logger.info(f"Mensaje {message_id} ya procesado anteriormente, saltando lógica de negocio")
             
             self.logger.info(f"Mensaje procesado exitosamente: {message_id}")
             
@@ -353,8 +398,9 @@ class WebhookProcessor:
             Nueva línea de mensajería
         """
         try:
-            # Generar line_id único
-            line_id = f"line_auto_{phone_number_id}"
+            # Generar line_id numérico único basado en timestamp
+            import time
+            line_id = int(time.time() * 1000) % 999999  # Generar ID numérico único
             
             line = self.line_repo.create(
                 line_id=line_id,
@@ -415,7 +461,7 @@ class WebhookProcessor:
         Envía una respuesta automática
         Args:
             phone_number: Número de destino
-            line_id: ID de la línea
+            line_id: ID de la línea (integer)
             text: Texto de la respuesta
         """
         try:
@@ -438,7 +484,7 @@ class WebhookProcessor:
                 
                 self.msg_repo.create(
                     whatsapp_message_id=whatsapp_message_id,
-                    line_id=line_id,
+                    line_id=line.line_id,  # Usar line.line_id en lugar de line_id string
                     phone_number=phone_number,
                     message_type='text',
                     content=text,

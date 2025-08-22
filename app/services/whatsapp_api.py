@@ -592,33 +592,47 @@ class WhatsAppAPIService:
     
     def verify_webhook_signature(self, payload: bytes, signature: str) -> bool:
         """
-        Verifica la firma de un webhook de WhatsApp
+        Verifica la firma de un webhook de WhatsApp usando App Secret de Facebook
         Args:
             payload: Cuerpo de la petición webhook
-            signature: Firma recibida en el header
+            signature: Firma recibida en el header X-Hub-Signature-256
         Returns:
             bool: True si la firma es válida
         """
-        webhook_secret = self.config.get('WEBHOOK_SECRET') if hasattr(self.config, 'get') else getattr(self.config, 'WEBHOOK_SECRET', None)
+        app_secret = self.config.get('FACEBOOK_APP_SECRET') if hasattr(self.config, 'get') else getattr(self.config, 'FACEBOOK_APP_SECRET', None)
         
-        if not webhook_secret:
-            self.logger.warning("Webhook secret no configurado. Saltando verificación de firma.")
+        if not app_secret:
+            self.logger.warning("App Secret de Facebook no configurado. Saltando verificación de firma.")
             return True
+        
+        if not signature:
+            self.logger.warning("Firma de webhook faltante en header X-Hub-Signature-256")
+            return False
         
         try:
             # WhatsApp envía la firma con prefijo "sha256="
             if signature.startswith('sha256='):
                 signature = signature[7:]
+            else:
+                self.logger.error("Formato de firma inválido - debe empezar con 'sha256='")
+                return False
             
-            # Calcular firma esperada
+            # Calcular firma esperada usando App Secret de Facebook
             expected_signature = hmac.new(
-                webhook_secret.encode('utf-8'),
+                app_secret.encode('utf-8'),
                 payload,
                 hashlib.sha256
             ).hexdigest()
             
             # Comparación segura
-            return hmac.compare_digest(signature, expected_signature)
+            is_valid = hmac.compare_digest(signature, expected_signature)
+            
+            if not is_valid:
+                self.logger.warning("Firma de webhook inválida")
+                self.logger.debug(f"Firma recibida: {signature}")
+                self.logger.debug(f"Firma esperada: {expected_signature}")
+            
+            return is_valid
             
         except Exception as e:
             self.logger.error(f"Error verificando firma de webhook: {e}")
