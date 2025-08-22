@@ -15,7 +15,7 @@ from app.api.messages.models import (
     TEXT_MESSAGE_FIELDS, MESSAGE_RESPONSE_FIELDS, UPDATE_STATUS_FIELDS,
     ERROR_RESPONSE_FIELDS, HEALTH_RESPONSE_FIELDS, IMAGE_MESSAGE_FIELDS, 
     IMAGE_UPLOAD_MESSAGE_FIELDS, MEDIA_UPLOAD_MESSAGE_FIELDS, LOCATION_MESSAGE_FIELDS,
-    CONTACTS_MESSAGE_FIELDS
+    CONTACTS_MESSAGE_FIELDS, INTERACTIVE_BUTTONS_MESSAGE_FIELDS, INTERACTIVE_LIST_MESSAGE_FIELDS
 )
 
 # Crear namespace para mensajes
@@ -30,6 +30,8 @@ text_message_request = messages_ns.model('TextMessageRequest', TEXT_MESSAGE_FIEL
 image_message_request = messages_ns.model('ImageMessageRequest', IMAGE_MESSAGE_FIELDS)
 location_message_request = messages_ns.model('LocationMessageRequest', LOCATION_MESSAGE_FIELDS)
 contacts_message_request = messages_ns.model('ContactsMessageRequest', CONTACTS_MESSAGE_FIELDS)
+interactive_buttons_request = messages_ns.model('InteractiveButtonsMessageRequest', INTERACTIVE_BUTTONS_MESSAGE_FIELDS)
+interactive_list_request = messages_ns.model('InteractiveListMessageRequest', INTERACTIVE_LIST_MESSAGE_FIELDS)
 image_upload_message_request = messages_ns.model('ImageUploadMessageRequest', IMAGE_UPLOAD_MESSAGE_FIELDS)
 media_upload_message_request = messages_ns.model('MediaUploadMessageRequest', MEDIA_UPLOAD_MESSAGE_FIELDS)
 message_response = messages_ns.model('MessageResponse', MESSAGE_RESPONSE_FIELDS)
@@ -391,6 +393,116 @@ class ContactsMessageResource(Resource):
             
             # Enviar mensaje usando el servicio
             result = message_service.send_contacts_message(message_data)
+            
+            # Devolver respuesta exitosa
+            return result
+            
+        except ValidationError as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="VALIDATION_ERROR"
+            )
+        except (MessageSendError, LineNotFoundError) as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="MESSAGE_SEND_ERROR"
+            )
+        except Exception as e:
+            messages_ns.abort(500,
+                message="Error interno del servidor",
+                error_code="INTERNAL_ERROR",
+                details=str(e)
+            )
+
+@messages_ns.route('/interactive/buttons')
+class InteractiveButtonsMessageResource(Resource):
+    """
+    Endpoint para envío de mensajes interactivos con botones de respuesta
+    """
+    
+    @messages_ns.doc('send_interactive_buttons_message', security='ApiKeyAuth')
+    @messages_ns.expect(interactive_buttons_request, validate=True)
+    @messages_ns.response(200, 'Mensaje interactivo con botones enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @require_api_key
+    def post(self):
+        """
+        Envía un mensaje interactivo con botones de respuesta
+        
+        Permite enviar mensajes con hasta 3 botones clickeables que el usuario
+        puede presionar para dar respuestas rápidas. Ideal para encuestas simples,
+        confirmaciones, menús de navegación básicos, etc.
+        """
+        try:
+            # Obtener datos del request
+            message_data = request.json
+            
+            # Validar datos requeridos
+            if not message_data:
+                messages_ns.abort(400, 
+                    message="Datos del mensaje requeridos",
+                    error_code="MISSING_DATA"
+                )
+            
+            # Enviar mensaje usando el servicio
+            result = message_service.send_interactive_message(message_data)
+            
+            # Devolver respuesta exitosa
+            return result
+            
+        except ValidationError as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="VALIDATION_ERROR"
+            )
+        except (MessageSendError, LineNotFoundError) as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="MESSAGE_SEND_ERROR"
+            )
+        except Exception as e:
+            messages_ns.abort(500,
+                message="Error interno del servidor",
+                error_code="INTERNAL_ERROR",
+                details=str(e)
+            )
+
+@messages_ns.route('/interactive/list')
+class InteractiveListMessageResource(Resource):
+    """
+    Endpoint para envío de mensajes interactivos con lista de opciones
+    """
+    
+    @messages_ns.doc('send_interactive_list_message', security='ApiKeyAuth')
+    @messages_ns.expect(interactive_list_request, validate=True)
+    @messages_ns.response(200, 'Mensaje interactivo con lista enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @require_api_key
+    def post(self):
+        """
+        Envía un mensaje interactivo con lista de opciones (menú desplegable)
+        
+        Permite enviar mensajes con un menú desplegable que contiene hasta 10 opciones
+        organizadas en secciones. Ideal para menús de servicios, catálogos, opciones
+        de soporte, etc.
+        """
+        try:
+            # Obtener datos del request
+            message_data = request.json
+            
+            # Validar datos requeridos
+            if not message_data:
+                messages_ns.abort(400, 
+                    message="Datos del mensaje requeridos",
+                    error_code="MISSING_DATA"
+                )
+            
+            # Enviar mensaje usando el servicio
+            result = message_service.send_interactive_message(message_data)
             
             # Devolver respuesta exitosa
             return result
@@ -1002,6 +1114,8 @@ class MessageTestResource(Resource):
                         'POST /v1/messages/image - Enviar mensaje de imagen (URL directa o media_id)',
                         'POST /v1/messages/location - Enviar mensaje de ubicación',
                         'POST /v1/messages/contacts - Enviar mensaje de contactos (vCard)',
+                        'POST /v1/messages/interactive/buttons - Enviar mensaje interactivo con botones (hasta 3)',
+                        'POST /v1/messages/interactive/list - Enviar mensaje interactivo con lista (hasta 10 opciones)',
                         'POST /v1/messages/image/upload - Subir archivo y enviar imagen (Caso 2: media_id)',
                         'POST /v1/messages/video/upload - Subir archivo y enviar video',
                         'POST /v1/messages/audio/upload - Subir archivo y enviar audio',

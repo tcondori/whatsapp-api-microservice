@@ -204,7 +204,7 @@ LOCATION_MESSAGE_FIELDS = {
     'to': fields.String(
         required=True,
         description='Número de teléfono destino en formato internacional',
-        example='5491123456789'
+        example='59167028778'
     ),
     'type': fields.String(
         required=True,
@@ -221,6 +221,147 @@ LOCATION_MESSAGE_FIELDS = {
             'longitude': -58.3816,
             'name': 'Obelisco de Buenos Aires',
             'address': 'Av. 9 de Julio s/n, C1043 CABA, Argentina'
+        }
+    ),
+    'messaging_line_id': fields.Integer(
+        required=False,
+        description='ID de la línea de mensajería a utilizar',
+        example=1
+    )
+}
+
+# Definición de campos para mensaje interactivo con botones (formato oficial Meta)
+INTERACTIVE_BUTTONS_MESSAGE_FIELDS = {
+    'to': fields.String(
+        required=True,
+        description='Número de teléfono destino en formato internacional',
+        example='5491123456789'
+    ),
+    'type': fields.String(
+        required=True,
+        description='Tipo de mensaje',
+        enum=['interactive'],
+        default='interactive',
+        example='interactive'
+    ),
+    'interactive': fields.Raw(
+        required=True,
+        description='Contenido del mensaje interactivo con botones según formato oficial WhatsApp Business API',
+        example={
+            'type': 'button',
+            'header': {
+                'type': 'text',
+                'text': '¿Cómo podemos ayudarte?'
+            },
+            'body': {
+                'text': 'Selecciona una de las siguientes opciones:'
+            },
+            'footer': {
+                'text': 'Responde tocando un botón'
+            },
+            'action': {
+                'buttons': [
+                    {
+                        'type': 'reply',
+                        'reply': {
+                            'id': 'btn_info',
+                            'title': 'Información'
+                        }
+                    },
+                    {
+                        'type': 'reply',
+                        'reply': {
+                            'id': 'btn_soporte',
+                            'title': 'Soporte'
+                        }
+                    },
+                    {
+                        'type': 'reply',
+                        'reply': {
+                            'id': 'btn_ventas',
+                            'title': 'Ventas'
+                        }
+                    }
+                ]
+            }
+        }
+    ),
+    'messaging_line_id': fields.Integer(
+        required=False,
+        description='ID de la línea de mensajería a utilizar',
+        example=1
+    )
+}
+
+# Definición de campos para mensaje interactivo con lista (formato oficial Meta)
+INTERACTIVE_LIST_MESSAGE_FIELDS = {
+    'to': fields.String(
+        required=True,
+        description='Número de teléfono destino en formato internacional',
+        example='5491123456789'
+    ),
+    'type': fields.String(
+        required=True,
+        description='Tipo de mensaje',
+        enum=['interactive'],
+        default='interactive',
+        example='interactive'
+    ),
+    'interactive': fields.Raw(
+        required=True,
+        description='Contenido del mensaje interactivo con lista según formato oficial WhatsApp Business API',
+        example={
+            'type': 'list',
+            'header': {
+                'type': 'text',
+                'text': 'Nuestros Servicios'
+            },
+            'body': {
+                'text': 'Elige el servicio que te interesa:'
+            },
+            'footer': {
+                'text': 'Toca para ver las opciones'
+            },
+            'action': {
+                'button': 'Ver Opciones',
+                'sections': [
+                    {
+                        'title': 'Servicios Principales',
+                        'rows': [
+                            {
+                                'id': 'srv_consulta',
+                                'title': 'Consulta Gratuita',
+                                'description': 'Agenda una consulta sin costo'
+                            },
+                            {
+                                'id': 'srv_desarrollo',
+                                'title': 'Desarrollo Web',
+                                'description': 'Sitios web y aplicaciones'
+                            },
+                            {
+                                'id': 'srv_marketing',
+                                'title': 'Marketing Digital',
+                                'description': 'Campañas y estrategias digitales'
+                            }
+                        ]
+                    },
+                    {
+                        'title': 'Soporte',
+                        'rows': [
+                            {
+                                'id': 'sup_tecnico',
+                                'title': 'Soporte Técnico',
+                                'description': 'Ayuda con problemas técnicos'
+                            },
+                            {
+                                'id': 'sup_facturacion',
+                                'title': 'Facturación',
+                                'description': 'Consultas sobre facturación'
+                            }
+                        ]
+                    }
+                ]
+            }
         }
     ),
     'messaging_line_id': fields.Integer(

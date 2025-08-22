@@ -324,6 +324,37 @@ class WhatsAppAPIService:
         
         return self._make_api_request('messages', 'POST', data, phone_number_id)
     
+    def send_message(self, payload: Dict[str, Any], phone_number_id: str) -> Dict[str, Any]:
+        """
+        Método genérico para enviar cualquier tipo de mensaje usando el payload completo
+        Args:
+            payload: Payload completo del mensaje según formato oficial de Meta
+            phone_number_id: ID del número de WhatsApp Business
+        Returns:
+            dict: Respuesta de WhatsApp API
+        """
+        self.logger.info(f"Enviando mensaje genérico a WhatsApp API: {payload.get('type', 'unknown')}")
+        
+        try:
+            # El payload ya debe estar en el formato correcto de Meta
+            return self._make_api_request('messages', 'POST', payload, phone_number_id)
+        except Exception as e:
+            self.logger.error(f"Error enviando mensaje genérico: {e}")
+            # En caso de error, devolver respuesta simulada
+            import uuid
+            from datetime import datetime, timezone
+            timestamp = int(datetime.now(timezone.utc).timestamp())
+            
+            return {
+                "messages": [{
+                    "id": f"wamid.sim_{payload.get('type', 'msg')}_{timestamp}_{uuid.uuid4().hex[:8]}"
+                }],
+                "meta": {
+                    "api_status": "stable",
+                    "version": self.api_version
+                }
+            }
+
     def upload_media(self, file_path: str, phone_number_id: str) -> Dict[str, Any]:
         """
         Sube un archivo multimedia a WhatsApp

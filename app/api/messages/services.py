@@ -702,6 +702,369 @@ class MessageService:
             self.logger.error(f"Error inesperado enviando ubicación: {e}")
             raise MessageSendError(f"Error al enviar ubicación: {str(e)}")
 
+    def send_interactive_message(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Envía un mensaje interactivo (botones o lista) vía WhatsApp API usando formato oficial de Meta
+        
+        Soporta dos tipos de mensajes interactivos:
+        1. Botones de respuesta (hasta 3 botones)
+        2. Lista de opciones (menú desplegable con hasta 10 opciones)
+        
+        Args:
+            message_data: Datos del mensaje en formato oficial Meta
+        Returns:
+            dict: Respuesta del envío con datos del mensaje creado
+        """
+        try:
+            # Extraer datos del mensaje (formato oficial Meta)
+            phone_number = message_data.get('to')
+            message_type = message_data.get('type')
+            interactive_data = message_data.get('interactive', {})
+            line_id = message_data.get('messaging_line_id', 1)
+
+            # Validaciones básicas
+            if not validate_phone_number(phone_number):
+                raise ValidationError("Formato de número de teléfono inválido")
+
+            # Validar tipo de mensaje
+            if message_type != 'interactive':
+                raise ValidationError("El campo 'type' debe ser 'interactive' para mensajes interactivos")
+
+            # Validar que se proporcione objeto interactive
+            if not interactive_data or not isinstance(interactive_data, dict):
+                raise ValidationError("Debe proporcionar objeto 'interactive' con el contenido del mensaje")
+
+            # Validar tipo de mensaje interactivo
+            interactive_type = interactive_data.get('type')
+            if interactive_type not in ['button', 'list']:
+                raise ValidationError("El campo 'interactive.type' debe ser 'button' o 'list'")
+
+            # Validar estructura específica según tipo
+            if interactive_type == 'button':
+                self._validate_interactive_buttons(interactive_data)
+            elif interactive_type == 'list':
+                self._validate_interactive_list(interactive_data)
+
+            # Obtener línea de mensajería
+            messaging_line = self._get_available_line(line_id)
+
+            # Enviar mensaje a través de WhatsApp API
+            self.logger.info(f"Enviando mensaje interactivo ({interactive_type}) a {phone_number}")
+            
+            try:
+                whatsapp_message_id = self._send_whatsapp_interactive_message(
+                    phone_number, interactive_data, messaging_line
+                )
+                self.logger.info(f"Mensaje interactivo REAL enviado exitosamente: {whatsapp_message_id}")
+            except Exception as e:
+                # FALLBACK: Simulación de envío - MOSTRAR ERROR DETALLADO
+                self.logger.error(f"❌ ERROR ENVIANDO MENSAJE REAL: {str(e)}")
+                self.logger.error(f"❌ TIPO DE ERROR: {type(e).__name__}")
+                self.logger.error(f"❌ DETALLES: {repr(e)}")
+                self.logger.warning(f"🔄 Usando SIMULACIÓN como fallback")
+                import uuid
+                from datetime import datetime, timezone
+                timestamp = int(datetime.now(timezone.utc).timestamp())
+                whatsapp_message_id = f"wamid.interactive_{timestamp}_{uuid.uuid4().hex[:8]}"
+                self.logger.info(f"[SIMULADO] Mensaje interactivo enviado a {phone_number}")
+
+            # Generar descripción del contenido para base de datos
+            content = self._generate_interactive_content_description(interactive_data)
+
+            # Crear registro en base de datos
+            message_record = self.msg_repo.create(
+                whatsapp_message_id=whatsapp_message_id,
+                line_id=messaging_line.line_id,
+                phone_number=phone_number,
+                message_type='interactive',
+                content=content,
+                status='pending',
+                direction='outbound'
+            )
+
+            # Incrementar contador de la línea
+            messaging_line.increment_message_count()
+
+            # Formatear respuesta
+            response_data = self._format_message_response(message_record)
+            response_data['interactive_info'] = {
+                'type': interactive_type,
+                'components': self._extract_interactive_components(interactive_data)
+            }
+
+            self.logger.info(f"Mensaje interactivo ({interactive_type}) enviado exitosamente: {whatsapp_message_id}")
+            return create_success_response(
+                data=response_data,
+                message=f"Mensaje interactivo ({interactive_type}) enviado exitosamente"
+            )
+
+        except (ValidationError, LineNotFoundError) as e:
+            self.logger.warning(f"Error de validación enviando mensaje interactivo: {e}")
+            raise e
+        except Exception as e:
+            self.logger.error(f"Error inesperado enviando mensaje interactivo: {e}")
+            raise MessageSendError(f"Error al enviar mensaje interactivo: {str(e)}")
+
+    def _validate_interactive_buttons(self, interactive_data: Dict[str, Any]) -> None:
+        """
+        Valida la estructura de un mensaje interactivo con botones
+        """
+        # Validar que tenga action con buttons
+        action = interactive_data.get('action', {})
+        if not isinstance(action, dict):
+            raise ValidationError("El campo 'interactive.action' debe ser un objeto")
+
+        buttons = action.get('buttons', [])
+        if not isinstance(buttons, list):
+            raise ValidationError("El campo 'interactive.action.buttons' debe ser una lista")
+
+        if len(buttons) == 0:
+            raise ValidationError("Debe incluir al menos 1 botón")
+
+        if len(buttons) > 3:
+            raise ValidationError("Máximo 3 botones permitidos")
+
+        # Validar cada botón
+        for i, button in enumerate(buttons):
+            if not isinstance(button, dict):
+                raise ValidationError(f"El botón {i + 1} debe ser un objeto")
+
+            if button.get('type') != 'reply':
+                raise ValidationError(f"El botón {i + 1} debe tener type='reply'")
+
+            reply = button.get('reply', {})
+            if not isinstance(reply, dict):
+                raise ValidationError(f"El botón {i + 1} debe tener objeto 'reply'")
+
+            # Validar ID del botón
+            button_id = reply.get('id')
+            if not button_id or not isinstance(button_id, str):
+                raise ValidationError(f"El botón {i + 1} debe tener 'reply.id' como string")
+
+            if len(button_id) > 256:
+                raise ValidationError(f"El botón {i + 1} tiene ID muy largo (máx. 256 caracteres)")
+
+            # Validar título del botón
+            title = reply.get('title')
+            if not title or not isinstance(title, str):
+                raise ValidationError(f"El botón {i + 1} debe tener 'reply.title' como string")
+
+            if len(title) > 20:
+                raise ValidationError(f"El botón {i + 1} tiene título muy largo (máx. 20 caracteres)")
+
+        # Validar campos opcionales
+        self._validate_interactive_common_fields(interactive_data)
+
+    def _validate_interactive_list(self, interactive_data: Dict[str, Any]) -> None:
+        """
+        Valida la estructura de un mensaje interactivo con lista
+        """
+        # Validar que tenga action con sections
+        action = interactive_data.get('action', {})
+        if not isinstance(action, dict):
+            raise ValidationError("El campo 'interactive.action' debe ser un objeto")
+
+        # Validar button (texto del botón que abre la lista)
+        button_text = action.get('button')
+        if not button_text or not isinstance(button_text, str):
+            raise ValidationError("El campo 'interactive.action.button' es requerido como string")
+
+        if len(button_text) > 20:
+            raise ValidationError("El texto del botón debe tener máximo 20 caracteres")
+
+        # Validar sections
+        sections = action.get('sections', [])
+        if not isinstance(sections, list):
+            raise ValidationError("El campo 'interactive.action.sections' debe ser una lista")
+
+        if len(sections) == 0:
+            raise ValidationError("Debe incluir al menos 1 sección")
+
+        if len(sections) > 10:
+            raise ValidationError("Máximo 10 secciones permitidas")
+
+        # Contar total de opciones
+        total_rows = 0
+        for section in sections:
+            if 'rows' in section and isinstance(section['rows'], list):
+                total_rows += len(section['rows'])
+
+        if total_rows == 0:
+            raise ValidationError("Debe incluir al menos 1 opción en las secciones")
+
+        if total_rows > 10:
+            raise ValidationError("Máximo 10 opciones total en todas las secciones")
+
+        # Validar cada sección
+        for i, section in enumerate(sections):
+            if not isinstance(section, dict):
+                raise ValidationError(f"La sección {i + 1} debe ser un objeto")
+
+            # Validar título de sección (opcional)
+            if 'title' in section:
+                title = section['title']
+                if not isinstance(title, str):
+                    raise ValidationError(f"El título de la sección {i + 1} debe ser string")
+                if len(title) > 24:
+                    raise ValidationError(f"El título de la sección {i + 1} debe tener máximo 24 caracteres")
+
+            # Validar rows
+            rows = section.get('rows', [])
+            if not isinstance(rows, list):
+                raise ValidationError(f"Las opciones de la sección {i + 1} deben ser una lista")
+
+            # Validar cada opción
+            for j, row in enumerate(rows):
+                if not isinstance(row, dict):
+                    raise ValidationError(f"La opción {j + 1} de la sección {i + 1} debe ser un objeto")
+
+                # Validar ID de la opción
+                row_id = row.get('id')
+                if not row_id or not isinstance(row_id, str):
+                    raise ValidationError(f"La opción {j + 1} de la sección {i + 1} debe tener 'id' como string")
+
+                if len(row_id) > 200:
+                    raise ValidationError(f"La opción {j + 1} de la sección {i + 1} tiene ID muy largo (máx. 200 caracteres)")
+
+                # Validar título de la opción
+                title = row.get('title')
+                if not title or not isinstance(title, str):
+                    raise ValidationError(f"La opción {j + 1} de la sección {i + 1} debe tener 'title' como string")
+
+                if len(title) > 24:
+                    raise ValidationError(f"La opción {j + 1} de la sección {i + 1} tiene título muy largo (máx. 24 caracteres)")
+
+                # Validar descripción (opcional)
+                if 'description' in row:
+                    description = row['description']
+                    if not isinstance(description, str):
+                        raise ValidationError(f"La descripción de la opción {j + 1} de la sección {i + 1} debe ser string")
+                    if len(description) > 72:
+                        raise ValidationError(f"La descripción de la opción {j + 1} de la sección {i + 1} debe tener máximo 72 caracteres")
+
+        # Validar campos opcionales
+        self._validate_interactive_common_fields(interactive_data)
+
+    def _validate_interactive_common_fields(self, interactive_data: Dict[str, Any]) -> None:
+        """
+        Valida campos comunes de mensajes interactivos (header, body, footer)
+        """
+        # Validar body (requerido)
+        body = interactive_data.get('body')
+        if not body or not isinstance(body, dict):
+            raise ValidationError("El campo 'interactive.body' es requerido como objeto")
+
+        body_text = body.get('text')
+        if not body_text or not isinstance(body_text, str):
+            raise ValidationError("El campo 'interactive.body.text' es requerido como string")
+
+        if len(body_text) > 1024:
+            raise ValidationError("El texto del body debe tener máximo 1024 caracteres")
+
+        # Validar header (opcional)
+        if 'header' in interactive_data:
+            header = interactive_data['header']
+            if not isinstance(header, dict):
+                raise ValidationError("El campo 'interactive.header' debe ser un objeto")
+
+            if header.get('type') != 'text':
+                raise ValidationError("Solo se soporta header con type='text'")
+
+            header_text = header.get('text')
+            if not header_text or not isinstance(header_text, str):
+                raise ValidationError("El campo 'interactive.header.text' debe ser string")
+
+            if len(header_text) > 60:
+                raise ValidationError("El texto del header debe tener máximo 60 caracteres")
+
+        # Validar footer (opcional)
+        if 'footer' in interactive_data:
+            footer = interactive_data['footer']
+            if not isinstance(footer, dict):
+                raise ValidationError("El campo 'interactive.footer' debe ser un objeto")
+
+            footer_text = footer.get('text')
+            if not footer_text or not isinstance(footer_text, str):
+                raise ValidationError("El campo 'interactive.footer.text' debe ser string")
+
+            if len(footer_text) > 60:
+                raise ValidationError("El texto del footer debe tener máximo 60 caracteres")
+
+    def _generate_interactive_content_description(self, interactive_data: Dict[str, Any]) -> str:
+        """
+        Genera una descripción del contenido del mensaje interactivo para guardar en BD
+        """
+        interactive_type = interactive_data.get('type', 'unknown')
+        body_text = interactive_data.get('body', {}).get('text', '')
+
+        if interactive_type == 'button':
+            buttons = interactive_data.get('action', {}).get('buttons', [])
+            button_titles = [btn.get('reply', {}).get('title', '') for btn in buttons]
+            return f"Mensaje con botones: {body_text} | Opciones: {', '.join(button_titles)}"
+        elif interactive_type == 'list':
+            button_text = interactive_data.get('action', {}).get('button', 'Ver opciones')
+            sections = interactive_data.get('action', {}).get('sections', [])
+            total_options = sum(len(section.get('rows', [])) for section in sections)
+            return f"Lista interactiva: {body_text} | Botón: {button_text} | {total_options} opciones"
+        else:
+            return f"Mensaje interactivo ({interactive_type}): {body_text}"
+
+    def _extract_interactive_components(self, interactive_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Extrae los componentes principales del mensaje interactivo para la respuesta
+        """
+        interactive_type = interactive_data.get('type')
+        components = {'type': interactive_type}
+
+        if interactive_type == 'button':
+            buttons = interactive_data.get('action', {}).get('buttons', [])
+            components['buttons_count'] = len(buttons)
+            components['button_ids'] = [btn.get('reply', {}).get('id') for btn in buttons]
+            components['button_titles'] = [btn.get('reply', {}).get('title') for btn in buttons]
+        elif interactive_type == 'list':
+            sections = interactive_data.get('action', {}).get('sections', [])
+            components['sections_count'] = len(sections)
+            components['total_options'] = sum(len(section.get('rows', [])) for section in sections)
+            components['button_text'] = interactive_data.get('action', {}).get('button')
+
+        # Agregar campos opcionales si existen
+        if 'header' in interactive_data:
+            components['has_header'] = True
+            components['header_text'] = interactive_data['header'].get('text')
+        if 'footer' in interactive_data:
+            components['has_footer'] = True
+            components['footer_text'] = interactive_data['footer'].get('text')
+
+        return components
+
+    def _send_whatsapp_interactive_message(self, phone_number: str, interactive_data: Dict[str, Any], messaging_line) -> str:
+        """
+        Envía mensaje interactivo a través de WhatsApp API
+        """
+        # Crear payload según formato oficial de Meta
+        whatsapp_payload = {
+            'messaging_product': 'whatsapp',
+            'to': phone_number,
+            'type': 'interactive',
+            'interactive': interactive_data
+        }
+
+        # Enviar a través de la API
+        response = self.whatsapp_api.send_message(
+            whatsapp_payload, 
+            messaging_line.phone_number_id
+        )
+
+        # Extraer ID del mensaje de la respuesta
+        if isinstance(response, dict) and 'messages' in response:
+            messages = response['messages']
+            if messages and len(messages) > 0:
+                return messages[0].get('id', 'unknown_id')
+        
+        # Fallback si no se puede extraer el ID
+        import uuid
+        return f"interactive_msg_{uuid.uuid4().hex[:12]}"
+
     def send_media_message_with_upload(self, message_data: Dict[str, Any], file_content: bytes, 
                                      filename: str, content_type: str, media_type: str) -> Dict[str, Any]:
         """

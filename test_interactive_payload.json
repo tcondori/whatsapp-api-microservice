@@ -1,0 +1,43 @@
+{
+    "to": "59167028778",
+    "type": "interactive",
+    "interactive": {
+        "type": "button",
+        "header": {
+            "type": "text",
+            "text": "¿Cómo podemos ayudarte?"
+        },
+        "body": {
+            "text": "Selecciona una de las siguientes opciones:"
+        },
+        "footer": {
+            "text": "Responde tocando un botón"
+        },
+        "action": {
+            "buttons": [
+                {
+                    "type": "reply",
+                    "reply": {
+                        "id": "btn_info",
+                        "title": "Información"
+                    }
+                },
+                {
+                    "type": "reply",
+                    "reply": {
+                        "id": "btn_soporte",
+                        "title": "Soporte"
+                    }
+                },
+                {
+                    "type": "reply",
+                    "reply": {
+                        "id": "btn_ventas",
+                        "title": "Ventas"
+                    }
+                }
+            ]
+        }
+    },
+    "messaging_line_id": 1
+}
