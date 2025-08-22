@@ -15,7 +15,8 @@ from app.api.messages.models import (
     TEXT_MESSAGE_FIELDS, MESSAGE_RESPONSE_FIELDS, UPDATE_STATUS_FIELDS,
     ERROR_RESPONSE_FIELDS, HEALTH_RESPONSE_FIELDS, IMAGE_MESSAGE_FIELDS, 
     IMAGE_UPLOAD_MESSAGE_FIELDS, MEDIA_UPLOAD_MESSAGE_FIELDS, LOCATION_MESSAGE_FIELDS,
-    CONTACTS_MESSAGE_FIELDS, INTERACTIVE_BUTTONS_MESSAGE_FIELDS, INTERACTIVE_LIST_MESSAGE_FIELDS
+    CONTACTS_MESSAGE_FIELDS, INTERACTIVE_BUTTONS_MESSAGE_FIELDS, INTERACTIVE_LIST_MESSAGE_FIELDS,
+    TEMPLATE_MESSAGE_FIELDS, TEMPLATE_TEXT_MESSAGE_FIELDS, TEMPLATE_MEDIA_MESSAGE_FIELDS
 )
 
 # Crear namespace para mensajes
@@ -32,6 +33,9 @@ location_message_request = messages_ns.model('LocationMessageRequest', LOCATION_
 contacts_message_request = messages_ns.model('ContactsMessageRequest', CONTACTS_MESSAGE_FIELDS)
 interactive_buttons_request = messages_ns.model('InteractiveButtonsMessageRequest', INTERACTIVE_BUTTONS_MESSAGE_FIELDS)
 interactive_list_request = messages_ns.model('InteractiveListMessageRequest', INTERACTIVE_LIST_MESSAGE_FIELDS)
+template_message_request = messages_ns.model('TemplateMessageRequest', TEMPLATE_MESSAGE_FIELDS)
+template_text_request = messages_ns.model('TemplateTextMessageRequest', TEMPLATE_TEXT_MESSAGE_FIELDS)
+template_media_request = messages_ns.model('TemplateMediaMessageRequest', TEMPLATE_MEDIA_MESSAGE_FIELDS)
 image_upload_message_request = messages_ns.model('ImageUploadMessageRequest', IMAGE_UPLOAD_MESSAGE_FIELDS)
 media_upload_message_request = messages_ns.model('MediaUploadMessageRequest', MEDIA_UPLOAD_MESSAGE_FIELDS)
 message_response = messages_ns.model('MessageResponse', MESSAGE_RESPONSE_FIELDS)
@@ -503,6 +507,395 @@ class InteractiveListMessageResource(Resource):
             
             # Enviar mensaje usando el servicio
             result = message_service.send_interactive_message(message_data)
+            
+            # Devolver respuesta exitosa
+            return result
+            
+        except ValidationError as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="VALIDATION_ERROR"
+            )
+        except (MessageSendError, LineNotFoundError) as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="MESSAGE_SEND_ERROR"
+            )
+        except Exception as e:
+            messages_ns.abort(500,
+                message="Error interno del servidor",
+                error_code="INTERNAL_ERROR",
+                details=str(e)
+            )
+
+@messages_ns.route('/template')
+class TemplateMessageResource(Resource):
+    """
+    Endpoint para envío de mensajes de plantilla (Template Messages) con variables
+    """
+    
+    @messages_ns.doc('send_template_message', security='ApiKeyAuth')
+    @messages_ns.expect(template_message_request, validate=True)
+    @messages_ns.response(200, 'Mensaje de plantilla enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @require_api_key
+    def post(self):
+        """
+        Envía un mensaje usando una plantilla pre-aprobada con variables dinámicas
+        
+        Los Template Messages son mensajes pre-aprobados por WhatsApp que permiten
+        enviar notificaciones con contenido dinámico usando variables y parámetros.
+        
+        **Formato del mensaje (oficial Meta/WhatsApp):**
+        ```json
+        {
+            "to": "5491123456789",
+            "type": "template",
+            "template": {
+                "name": "hello_world",
+                "language": {
+                    "code": "es"
+                },
+                "components": [
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {
+                                "type": "text",
+                                "text": "Juan Pérez"
+                            }
+                        ]
+                    }
+                ]
+            },
+            "messaging_line_id": 1
+        }
+        ```
+        
+        **Tipos de componentes soportados:**
+        - `header`: Encabezado con texto, imagen, video o documento
+        - `body`: Cuerpo del mensaje con variables {{1}}, {{2}}, etc.
+        - `footer`: Pie de mensaje (opcional)
+        - `button`: Botones interactivos (Call-to-Action, Quick Reply)
+        
+        **Tipos de parámetros:**
+        - `text`: Texto simple
+        - `currency`: Moneda con formato
+        - `date_time`: Fecha y hora formateada
+        - `image`: Imagen para header
+        - `video`: Video para header
+        - `document`: Documento para header
+        - `location`: Ubicación geográfica para header
+        
+        **Ejemplo con variables múltiples:**
+        ```json
+        {
+            "to": "5491123456789",
+            "type": "template",
+            "template": {
+                "name": "order_confirmation",
+                "language": {
+                    "code": "es"
+                },
+                "components": [
+                    {
+                        "type": "header",
+                        "parameters": [
+                            {
+                                "type": "image",
+                                "image": {
+                                    "link": "https://ejemplo.com/producto.jpg"
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {
+                                "type": "text",
+                                "text": "Juan Pérez"
+                            },
+                            {
+                                "type": "text",
+                                "text": "ABC-123"
+                            },
+                            {
+                                "type": "currency",
+                                "currency": {
+                                    "fallback_value": "$29.99",
+                                    "code": "USD",
+                                    "amount_1000": 29990
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        "type": "button",
+                        "sub_type": "quick_reply",
+                        "index": "0",
+                        "parameters": [
+                            {
+                                "type": "payload",
+                                "payload": "confirm_order_123"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+        ```
+        
+        **IMPORTANTE:**
+        - La plantilla debe estar **pre-aprobada** por WhatsApp
+        - Las variables se reemplazan en orden: {{1}}, {{2}}, {{3}}, etc.
+        - Los códigos de idioma deben ser válidos (es, en_US, pt_BR, etc.)
+        - Los botones dinámicos requieren parámetros específicos
+        """
+        try:
+            # Obtener datos del request
+            message_data = request.json
+            
+            # Validar datos requeridos
+            if not message_data:
+                messages_ns.abort(400, 
+                    message="Datos del mensaje requeridos",
+                    error_code="MISSING_DATA"
+                )
+            
+            # Enviar mensaje usando el servicio
+            result = message_service.send_template_message(message_data)
+            
+            # Devolver respuesta exitosa
+            return result
+            
+        except ValidationError as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="VALIDATION_ERROR"
+            )
+        except (MessageSendError, LineNotFoundError) as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="MESSAGE_SEND_ERROR"
+            )
+        except Exception as e:
+            messages_ns.abort(500,
+                message="Error interno del servidor",
+                error_code="INTERNAL_ERROR",
+                details=str(e)
+            )
+
+@messages_ns.route('/template/text')
+class TemplateTextMessageResource(Resource):
+    """
+    Endpoint simplificado para mensajes de plantilla de texto con variables
+    """
+    
+    @messages_ns.doc('send_template_text_message', security='ApiKeyAuth')
+    @messages_ns.expect(template_text_request, validate=True)
+    @messages_ns.response(200, 'Mensaje de plantilla de texto enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @require_api_key
+    def post(self):
+        """
+        Envía un mensaje de plantilla de texto con variables (interfaz simplificada)
+        
+        Esta es una interfaz simplificada para enviar plantillas de texto básicas
+        con variables. Ideal para notificaciones simples sin multimedia.
+        
+        **Formato simplificado:**
+        ```json
+        {
+            "to": "5491123456789",
+            "template_name": "hello_world",
+            "language_code": "es",
+            "variables": ["Juan Pérez", "Producto ABC"],
+            "messaging_line_id": 1
+        }
+        ```
+        
+        **Equivale a este formato oficial:**
+        ```json
+        {
+            "to": "5491123456789",
+            "type": "template",
+            "template": {
+                "name": "hello_world",
+                "language": {"code": "es"},
+                "components": [
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {"type": "text", "text": "Juan Pérez"},
+                            {"type": "text", "text": "Producto ABC"}
+                        ]
+                    }
+                ]
+            }
+        }
+        ```
+        
+        **Parámetros:**
+        - `to`: Número de teléfono destino
+        - `template_name`: Nombre de la plantilla aprobada
+        - `language_code`: Código de idioma (es, en_US, pt_BR, etc.)
+        - `variables`: Lista de textos para reemplazar {{1}}, {{2}}, {{3}}, etc.
+        - `messaging_line_id`: ID de línea de mensajería (opcional)
+        
+        **Ejemplos de plantillas comunes:**
+        - `hello_world`: Plantilla básica de saludo
+        - `order_confirmation`: Confirmación de pedido
+        - `appointment_reminder`: Recordatorio de cita
+        - `payment_confirmation`: Confirmación de pago
+        """
+        try:
+            # Obtener datos del request
+            message_data = request.json
+            
+            # Validar datos requeridos
+            if not message_data:
+                messages_ns.abort(400, 
+                    message="Datos del mensaje requeridos",
+                    error_code="MISSING_DATA"
+                )
+            
+            # Convertir formato simplificado a formato oficial
+            template_data = message_service.convert_simple_template_to_official(message_data)
+            
+            # Enviar mensaje usando el servicio
+            result = message_service.send_template_message(template_data)
+            
+            # Devolver respuesta exitosa
+            return result
+            
+        except ValidationError as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="VALIDATION_ERROR"
+            )
+        except (MessageSendError, LineNotFoundError) as e:
+            messages_ns.abort(400,
+                message=str(e),
+                error_code="MESSAGE_SEND_ERROR"
+            )
+        except Exception as e:
+            messages_ns.abort(500,
+                message="Error interno del servidor",
+                error_code="INTERNAL_ERROR",
+                details=str(e)
+            )
+
+@messages_ns.route('/template/media')
+class TemplateMediaMessageResource(Resource):
+    """
+    Endpoint para mensajes de plantilla multimedia con variables
+    """
+    
+    @messages_ns.doc('send_template_media_message', security='ApiKeyAuth')
+    @messages_ns.expect(template_media_request, validate=True)
+    @messages_ns.response(200, 'Mensaje de plantilla multimedia enviado exitosamente', message_response)
+    @messages_ns.response(400, 'Error de validación', error_response)
+    @messages_ns.response(401, 'No autorizado')
+    @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @require_api_key
+    def post(self):
+        """
+        Envía un mensaje de plantilla multimedia con variables y botones dinámicos
+        
+        Permite enviar plantillas que incluyen:
+        - **Header multimedia**: Imagen, video o documento dinámico
+        - **Variables en el cuerpo**: Texto, moneda, fecha/hora
+        - **Botones dinámicos**: Payloads personalizados para Quick Reply
+        
+        **Formato simplificado:**
+        ```json
+        {
+            "to": "5491123456789",
+            "template_name": "product_promotion",
+            "language_code": "es",
+            "header_media": {
+                "type": "image",
+                "image": {
+                    "link": "https://ejemplo.com/promocion.jpg"
+                }
+            },
+            "body_variables": ["Juan", "50% OFF", "$19.99"],
+            "button_parameters": [
+                {
+                    "type": "quick_reply",
+                    "index": 0,
+                    "payload": "promo_interested_123"
+                }
+            ],
+            "messaging_line_id": 1
+        }
+        ```
+        
+        **Tipos de header multimedia:**
+        - `image`: {"type": "image", "image": {"link": "URL"}}
+        - `video`: {"type": "video", "video": {"link": "URL"}}  
+        - `document`: {"type": "document", "document": {"link": "URL"}}
+        
+        **Variables especiales del cuerpo:**
+        - Texto: "Juan Pérez"
+        - Moneda: {"type": "currency", "currency": {"fallback_value": "$29.99", "code": "USD", "amount_1000": 29990}}
+        - Fecha: {"type": "date_time", "date_time": {"fallback_value": "25 de Diciembre, 2024"}}
+        
+        **Parámetros de botones:**
+        - Quick Reply: {"type": "quick_reply", "index": 0, "payload": "mi_payload"}
+        - Call-to-Action: {"type": "url", "index": 0, "url": "https://misite.com/producto"}
+        
+        **Ejemplo completo:**
+        ```json
+        {
+            "to": "5491123456789",
+            "template_name": "order_shipped",
+            "language_code": "es",
+            "header_media": {
+                "type": "image", 
+                "image": {"link": "https://tienda.com/shipping.jpg"}
+            },
+            "body_variables": [
+                "María García",
+                "ORD-12345", 
+                "2-3 días hábiles"
+            ],
+            "button_parameters": [
+                {
+                    "type": "quick_reply",
+                    "index": 0,
+                    "payload": "track_order_12345"
+                },
+                {
+                    "type": "url", 
+                    "index": 1,
+                    "url": "https://tracking.com/12345"
+                }
+            ]
+        }
+        ```
+        """
+        try:
+            # Obtener datos del request
+            message_data = request.json
+            
+            # Validar datos requeridos
+            if not message_data:
+                messages_ns.abort(400, 
+                    message="Datos del mensaje requeridos",
+                    error_code="MISSING_DATA"
+                )
+            
+            # Convertir formato simplificado a formato oficial
+            template_data = message_service.convert_media_template_to_official(message_data)
+            
+            # Enviar mensaje usando el servicio
+            result = message_service.send_template_message(template_data)
             
             # Devolver respuesta exitosa
             return result
@@ -1116,6 +1509,9 @@ class MessageTestResource(Resource):
                         'POST /v1/messages/contacts - Enviar mensaje de contactos (vCard)',
                         'POST /v1/messages/interactive/buttons - Enviar mensaje interactivo con botones (hasta 3)',
                         'POST /v1/messages/interactive/list - Enviar mensaje interactivo con lista (hasta 10 opciones)',
+                        'POST /v1/messages/template - Enviar mensaje de plantilla con variables (formato oficial)',
+                        'POST /v1/messages/template/text - Enviar plantilla de texto (interfaz simplificada)',
+                        'POST /v1/messages/template/media - Enviar plantilla multimedia con botones dinámicos',
                         'POST /v1/messages/image/upload - Subir archivo y enviar imagen (Caso 2: media_id)',
                         'POST /v1/messages/video/upload - Subir archivo y enviar video',
                         'POST /v1/messages/audio/upload - Subir archivo y enviar audio',

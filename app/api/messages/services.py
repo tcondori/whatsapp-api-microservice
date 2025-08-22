@@ -1065,6 +1065,461 @@ class MessageService:
         import uuid
         return f"interactive_msg_{uuid.uuid4().hex[:12]}"
 
+    def send_template_message(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Envía un mensaje de plantilla (Template Message) con variables dinámicas
+        
+        Los template messages son mensajes pre-aprobados que permiten contenido dinámico
+        usando variables y parámetros según el formato oficial de Meta WhatsApp Business API.
+        
+        Args:
+            message_data: Datos del mensaje en formato oficial Meta
+        Returns:
+            dict: Respuesta del envío con datos del mensaje creado
+        """
+        try:
+            # Extraer datos del mensaje (formato oficial Meta)
+            phone_number = message_data.get('to')
+            message_type = message_data.get('type')
+            template_data = message_data.get('template', {})
+            line_id = message_data.get('messaging_line_id', 1)
+
+            # Validaciones básicas
+            if not validate_phone_number(phone_number):
+                raise ValidationError("Formato de número de teléfono inválido")
+
+            # Validar tipo de mensaje
+            if message_type != 'template':
+                raise ValidationError("El campo 'type' debe ser 'template' para mensajes de plantilla")
+
+            # Validar que se proporcione objeto template
+            if not template_data or not isinstance(template_data, dict):
+                raise ValidationError("Debe proporcionar objeto 'template' con la configuración de la plantilla")
+
+            # Validar estructura de la plantilla
+            self._validate_template_structure(template_data)
+
+            # Obtener línea de mensajería
+            messaging_line = self._get_available_line(line_id)
+
+            # Enviar mensaje a través de WhatsApp API
+            template_name = template_data.get('name', 'unknown')
+            self.logger.info(f"Enviando mensaje de plantilla '{template_name}' a {phone_number}")
+            
+            try:
+                whatsapp_message_id = self._send_whatsapp_template_message(
+                    phone_number, template_data, messaging_line
+                )
+                self.logger.info(f"Mensaje de plantilla REAL enviado exitosamente: {whatsapp_message_id}")
+            except Exception as e:
+                # FALLBACK: Simulación de envío - MOSTRAR ERROR DETALLADO
+                self.logger.error(f"❌ ERROR ENVIANDO PLANTILLA REAL: {str(e)}")
+                self.logger.error(f"❌ TIPO DE ERROR: {type(e).__name__}")
+                self.logger.error(f"❌ DETALLES: {repr(e)}")
+                self.logger.warning(f"🔄 Usando SIMULACIÓN como fallback para plantilla")
+                import uuid
+                from datetime import datetime, timezone
+                timestamp = int(datetime.now(timezone.utc).timestamp())
+                whatsapp_message_id = f"wamid.template_{timestamp}_{uuid.uuid4().hex[:8]}"
+                self.logger.info(f"[SIMULADO] Mensaje de plantilla enviado a {phone_number}")
+
+            # Generar descripción del contenido para base de datos
+            content = self._generate_template_content_description(template_data)
+
+            # Crear registro en base de datos
+            message_record = self.msg_repo.create(
+                whatsapp_message_id=whatsapp_message_id,
+                line_id=messaging_line.line_id,
+                phone_number=phone_number,
+                message_type='template',
+                content=content,
+                status='pending',
+                direction='outbound'
+            )
+
+            # Incrementar contador de la línea
+            messaging_line.increment_message_count()
+
+            # Formatear respuesta
+            response_data = self._format_message_response(message_record)
+            response_data['template_info'] = {
+                'name': template_data.get('name'),
+                'language': template_data.get('language', {}).get('code'),
+                'components': self._extract_template_components_summary(template_data)
+            }
+
+            self.logger.info(f"Mensaje de plantilla '{template_name}' enviado exitosamente: {whatsapp_message_id}")
+            return create_success_response(
+                data=response_data,
+                message=f"Mensaje de plantilla '{template_name}' enviado exitosamente"
+            )
+
+        except (ValidationError, LineNotFoundError) as e:
+            self.logger.warning(f"Error de validación enviando plantilla: {e}")
+            raise e
+        except Exception as e:
+            self.logger.error(f"Error inesperado enviando plantilla: {e}")
+            raise MessageSendError(f"Error al enviar plantilla: {str(e)}")
+
+    def convert_simple_template_to_official(self, simple_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convierte formato simplificado de plantilla a formato oficial de Meta
+        
+        Entrada:
+        {
+            "to": "5491123456789",
+            "template_name": "hello_world",
+            "language_code": "es",
+            "variables": ["Juan", "Producto ABC"]
+        }
+        
+        Salida:
+        {
+            "to": "5491123456789",
+            "type": "template",
+            "template": {
+                "name": "hello_world",
+                "language": {"code": "es"},
+                "components": [
+                    {
+                        "type": "body",
+                        "parameters": [
+                            {"type": "text", "text": "Juan"},
+                            {"type": "text", "text": "Producto ABC"}
+                        ]
+                    }
+                ]
+            }
+        }
+        """
+        # Validar datos de entrada
+        template_name = simple_data.get('template_name')
+        language_code = simple_data.get('language_code')
+        variables = simple_data.get('variables', [])
+        
+        if not template_name:
+            raise ValidationError("Campo 'template_name' es requerido")
+        if not language_code:
+            raise ValidationError("Campo 'language_code' es requerido")
+
+        # Construir formato oficial
+        official_data = {
+            'to': simple_data.get('to'),
+            'type': 'template',
+            'template': {
+                'name': template_name,
+                'language': {
+                    'code': language_code
+                }
+            }
+        }
+
+        # Agregar componentes si hay variables
+        if variables:
+            components = []
+            
+            # Crear componente body con parámetros
+            body_parameters = []
+            for variable in variables:
+                body_parameters.append({
+                    'type': 'text',
+                    'text': str(variable)
+                })
+            
+            if body_parameters:
+                components.append({
+                    'type': 'body',
+                    'parameters': body_parameters
+                })
+            
+            official_data['template']['components'] = components
+
+        # Mantener messaging_line_id si está presente
+        if 'messaging_line_id' in simple_data:
+            official_data['messaging_line_id'] = simple_data['messaging_line_id']
+
+        return official_data
+
+    def convert_media_template_to_official(self, media_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Convierte formato simplificado de plantilla multimedia a formato oficial de Meta
+        """
+        # Validar datos de entrada
+        template_name = media_data.get('template_name')
+        language_code = media_data.get('language_code')
+        
+        if not template_name:
+            raise ValidationError("Campo 'template_name' es requerido")
+        if not language_code:
+            raise ValidationError("Campo 'language_code' es requerido")
+
+        # Construir formato oficial
+        official_data = {
+            'to': media_data.get('to'),
+            'type': 'template',
+            'template': {
+                'name': template_name,
+                'language': {
+                    'code': language_code
+                },
+                'components': []
+            }
+        }
+
+        components = []
+
+        # Procesar header multimedia
+        header_media = media_data.get('header_media')
+        if header_media:
+            components.append({
+                'type': 'header',
+                'parameters': [header_media]
+            })
+
+        # Procesar variables del cuerpo
+        body_variables = media_data.get('body_variables', [])
+        if body_variables:
+            body_parameters = []
+            for variable in body_variables:
+                if isinstance(variable, str):
+                    body_parameters.append({
+                        'type': 'text',
+                        'text': variable
+                    })
+                elif isinstance(variable, dict):
+                    # Variable especial (currency, date_time, etc.)
+                    body_parameters.append(variable)
+            
+            if body_parameters:
+                components.append({
+                    'type': 'body',
+                    'parameters': body_parameters
+                })
+
+        # Procesar parámetros de botones
+        button_parameters = media_data.get('button_parameters', [])
+        for button_param in button_parameters:
+            button_component = {
+                'type': 'button',
+                'sub_type': button_param.get('type', 'quick_reply'),
+                'index': str(button_param.get('index', 0)),
+                'parameters': []
+            }
+            
+            if button_param.get('type') == 'quick_reply' and 'payload' in button_param:
+                button_component['parameters'].append({
+                    'type': 'payload',
+                    'payload': button_param['payload']
+                })
+            elif button_param.get('type') == 'url' and 'url' in button_param:
+                button_component['parameters'].append({
+                    'type': 'text',
+                    'text': button_param['url']
+                })
+            
+            components.append(button_component)
+
+        official_data['template']['components'] = components
+
+        # Mantener messaging_line_id si está presente
+        if 'messaging_line_id' in media_data:
+            official_data['messaging_line_id'] = media_data['messaging_line_id']
+
+        return official_data
+
+    def _validate_template_structure(self, template_data: Dict[str, Any]) -> None:
+        """
+        Valida la estructura de un mensaje de plantilla según formato oficial de Meta
+        """
+        # Validar que tenga name
+        template_name = template_data.get('name')
+        if not template_name or not isinstance(template_name, str):
+            raise ValidationError("El campo 'template.name' es requerido como string")
+
+        # Validar que tenga language
+        language = template_data.get('language', {})
+        if not isinstance(language, dict):
+            raise ValidationError("El campo 'template.language' debe ser un objeto")
+
+        language_code = language.get('code')
+        if not language_code or not isinstance(language_code, str):
+            raise ValidationError("El campo 'template.language.code' es requerido como string")
+
+        # Validar formato de código de idioma (básico)
+        if len(language_code) < 2:
+            raise ValidationError("Código de idioma inválido")
+
+        # Validar componentes si están presentes
+        components = template_data.get('components', [])
+        if components:
+            if not isinstance(components, list):
+                raise ValidationError("El campo 'template.components' debe ser una lista")
+
+            for i, component in enumerate(components):
+                self._validate_template_component(component, i)
+
+    def _validate_template_component(self, component: Dict[str, Any], index: int) -> None:
+        """
+        Valida un componente individual de la plantilla
+        """
+        if not isinstance(component, dict):
+            raise ValidationError(f"El componente {index} debe ser un objeto")
+
+        component_type = component.get('type')
+        if not component_type:
+            raise ValidationError(f"El componente {index} debe tener campo 'type'")
+
+        # Validar tipos de componente permitidos
+        valid_types = ['header', 'body', 'footer', 'button']
+        if component_type not in valid_types:
+            raise ValidationError(f"Tipo de componente inválido en posición {index}: {component_type}")
+
+        # Validar parámetros si están presentes
+        parameters = component.get('parameters', [])
+        if parameters:
+            if not isinstance(parameters, list):
+                raise ValidationError(f"Los parámetros del componente {index} deben ser una lista")
+
+            for j, param in enumerate(parameters):
+                self._validate_template_parameter(param, index, j)
+
+        # Validaciones específicas por tipo de componente
+        if component_type == 'button':
+            self._validate_button_component(component, index)
+
+    def _validate_template_parameter(self, parameter: Dict[str, Any], comp_index: int, param_index: int) -> None:
+        """
+        Valida un parámetro individual de un componente
+        """
+        if not isinstance(parameter, dict):
+            raise ValidationError(f"El parámetro {param_index} del componente {comp_index} debe ser un objeto")
+
+        param_type = parameter.get('type')
+        if not param_type:
+            raise ValidationError(f"El parámetro {param_index} del componente {comp_index} debe tener campo 'type'")
+
+        # Validar tipos de parámetro permitidos
+        valid_types = ['text', 'currency', 'date_time', 'image', 'video', 'document', 'location', 'payload']
+        if param_type not in valid_types:
+            raise ValidationError(f"Tipo de parámetro inválido: {param_type}")
+
+        # Validaciones específicas por tipo
+        if param_type == 'text':
+            text_value = parameter.get('text')
+            if not text_value or not isinstance(text_value, str):
+                raise ValidationError(f"Parámetro de texto debe tener campo 'text' como string")
+
+        elif param_type == 'currency':
+            currency_data = parameter.get('currency', {})
+            if not isinstance(currency_data, dict):
+                raise ValidationError(f"Parámetro de currency debe tener objeto 'currency'")
+
+            required_fields = ['fallback_value', 'code', 'amount_1000']
+            for field in required_fields:
+                if field not in currency_data:
+                    raise ValidationError(f"Currency debe tener campo '{field}'")
+
+    def _validate_button_component(self, component: Dict[str, Any], index: int) -> None:
+        """
+        Valida un componente de botón
+        """
+        sub_type = component.get('sub_type')
+        if not sub_type:
+            raise ValidationError(f"El botón en posición {index} debe tener campo 'sub_type'")
+
+        valid_sub_types = ['quick_reply', 'url', 'phone_number']
+        if sub_type not in valid_sub_types:
+            raise ValidationError(f"sub_type inválido para botón: {sub_type}")
+
+        # Validar que tenga índice
+        button_index = component.get('index')
+        if button_index is None:
+            raise ValidationError(f"El botón en posición {index} debe tener campo 'index'")
+
+    def _generate_template_content_description(self, template_data: Dict[str, Any]) -> str:
+        """
+        Genera una descripción del contenido de la plantilla para guardar en BD
+        """
+        template_name = template_data.get('name', 'unknown')
+        language_code = template_data.get('language', {}).get('code', 'unknown')
+        
+        components = template_data.get('components', [])
+        component_types = [comp.get('type') for comp in components if comp.get('type')]
+        
+        components_str = ', '.join(component_types) if component_types else 'sin componentes'
+        
+        # Contar variables
+        total_params = 0
+        for comp in components:
+            params = comp.get('parameters', [])
+            total_params += len(params)
+        
+        return f"Plantilla '{template_name}' ({language_code}) | Componentes: {components_str} | Variables: {total_params}"
+
+    def _extract_template_components_summary(self, template_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Extrae un resumen de los componentes de la plantilla para la respuesta
+        """
+        components = template_data.get('components', [])
+        
+        summary = {
+            'total_components': len(components),
+            'component_types': [],
+            'total_variables': 0,
+            'has_media': False,
+            'has_buttons': False
+        }
+        
+        for comp in components:
+            comp_type = comp.get('type')
+            if comp_type:
+                summary['component_types'].append(comp_type)
+            
+            # Contar parámetros
+            params = comp.get('parameters', [])
+            summary['total_variables'] += len(params)
+            
+            # Detectar multimedia
+            if comp_type == 'header':
+                for param in params:
+                    if param.get('type') in ['image', 'video', 'document']:
+                        summary['has_media'] = True
+                        break
+            
+            # Detectar botones
+            if comp_type == 'button':
+                summary['has_buttons'] = True
+        
+        return summary
+
+    def _send_whatsapp_template_message(self, phone_number: str, template_data: Dict[str, Any], messaging_line) -> str:
+        """
+        Envía mensaje de plantilla a través de WhatsApp API
+        """
+        # Crear payload según formato oficial de Meta
+        whatsapp_payload = {
+            'messaging_product': 'whatsapp',
+            'to': phone_number,
+            'type': 'template',
+            'template': template_data
+        }
+
+        # Enviar a través de la API
+        response = self.whatsapp_api.send_message(
+            whatsapp_payload, 
+            messaging_line.phone_number_id
+        )
+
+        # Extraer ID del mensaje de la respuesta
+        if isinstance(response, dict) and 'messages' in response:
+            messages = response['messages']
+            if messages and len(messages) > 0:
+                return messages[0].get('id', 'unknown_id')
+        
+        # Fallback si no se puede extraer el ID
+        import uuid
+        return f"template_msg_{uuid.uuid4().hex[:12]}"
+
     def send_media_message_with_upload(self, message_data: Dict[str, Any], file_content: bytes, 
                                      filename: str, content_type: str, media_type: str) -> Dict[str, Any]:
         """

@@ -1,0 +1,74 @@
+{
+  "mensaje_completo": {
+    "descripcion": "Formato oficial completo de Meta para plantilla con imagen y variable",
+    "endpoint": "/api/v1/messages/template",
+    "body": {
+      "to": "5491123456789",
+      "type": "template",
+      "messaging_line_id": 1,
+      "template": {
+        "name": "cumpleanos_template",
+        "language": {
+          "code": "es"
+        },
+        "components": [
+          {
+            "type": "header",
+            "parameters": [
+              {
+                "type": "image",
+                "image": {
+                  "link": "https://ejemplo.com/imagen-cumpleanos.jpg"
+                }
+              }
+            ]
+          },
+          {
+            "type": "body",
+            "parameters": [
+              {
+                "type": "text",
+                "text": "Juan Carlos"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "mensaje_simplificado": {
+    "descripcion": "Formato simplificado usando nuestro endpoint personalizado",
+    "endpoint": "/api/v1/messages/template/media",
+    "body": {
+      "to": "5491123456789",
+      "template_name": "cumpleanos_template",
+      "language_code": "es",
+      "messaging_line_id": 1,
+      "header_media": {
+        "type": "image",
+        "image": {
+          "link": "https://ejemplo.com/imagen-cumpleanos.jpg"
+        }
+      },
+      "body_variables": [
+        "Juan Carlos"
+      ]
+    }
+  },
+  "ejemplos_url_imagen": {
+    "descripcion": "URLs de ejemplo para testing",
+    "urls": [
+      "https://picsum.photos/800/600?random=1",
+      "https://images.unsplash.com/photo-1464207687429-7505649dae38?w=800&h=600&fit=crop",
+      "https://httpbin.org/image/jpeg"
+    ]
+  },
+  "estructura_plantilla_meta": {
+    "descripcion": "Cómo debe estar configurada tu plantilla en Meta Business",
+    "header": "IMAGEN",
+    "body": "Hola, ESTIMADO(A) {{1}}! ¡Hoy es el día perfecto para celebrar! 🎂 Que tengas un muy feliz cumpleaños. ¿Ya tienes listos tus deseos? Pídelos en tu tarjeta virtual:",
+    "variables": {
+      "{{1}}": "Nombre del cumpleañero (será reemplazado por tu variable)"
+    }
+  }
+}

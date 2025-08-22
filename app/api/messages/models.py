@@ -371,6 +371,130 @@ INTERACTIVE_LIST_MESSAGE_FIELDS = {
     )
 }
 
+# Definición de campos para mensaje de plantilla (Template Message) con variables
+TEMPLATE_MESSAGE_FIELDS = {
+    'to': fields.String(
+        required=True,
+        description='Número de teléfono destino en formato internacional',
+        example='5491123456789'
+    ),
+    'type': fields.String(
+        required=True,
+        description='Tipo de mensaje',
+        enum=['template'],
+        default='template',
+        example='template'
+    ),
+    'template': fields.Raw(
+        required=True,
+        description='Configuración de la plantilla según formato oficial Meta WhatsApp Business API',
+        example={
+            'name': 'hello_world',
+            'language': {
+                'code': 'es'
+            },
+            'components': [
+                {
+                    'type': 'body',
+                    'parameters': [
+                        {
+                            'type': 'text',
+                            'text': 'Juan Pérez'
+                        }
+                    ]
+                }
+            ]
+        }
+    ),
+    'messaging_line_id': fields.Integer(
+        required=False,
+        description='ID de la línea de mensajería a utilizar',
+        example=1
+    )
+}
+
+# Definición de campos para plantilla de texto básica
+TEMPLATE_TEXT_MESSAGE_FIELDS = {
+    'to': fields.String(
+        required=True,
+        description='Número de teléfono destino en formato internacional',
+        example='5491123456789'
+    ),
+    'template_name': fields.String(
+        required=True,
+        description='Nombre de la plantilla aprobada',
+        example='hello_world'
+    ),
+    'language_code': fields.String(
+        required=True,
+        description='Código de idioma y localización (ISO 639-1)',
+        example='es'
+    ),
+    'variables': fields.List(
+        fields.String(),
+        required=False,
+        description='Lista de variables para reemplazar en la plantilla (orden importa)',
+        example=['Juan Pérez', 'Producto ABC', '29.99']
+    ),
+    'messaging_line_id': fields.Integer(
+        required=False,
+        description='ID de la línea de mensajería a utilizar',
+        example=1
+    )
+}
+
+# Definición de campos para plantilla multimedia con variables
+TEMPLATE_MEDIA_MESSAGE_FIELDS = {
+    'to': fields.String(
+        required=True,
+        description='Número de teléfono destino en formato internacional',
+        example='5491123456789'
+    ),
+    'template_name': fields.String(
+        required=True,
+        description='Nombre de la plantilla multimedia aprobada',
+        example='order_confirmation'
+    ),
+    'language_code': fields.String(
+        required=True,
+        description='Código de idioma y localización',
+        example='es'
+    ),
+    'header_media': fields.Raw(
+        required=False,
+        description='Contenido multimedia para el header',
+        example={
+            'type': 'image',
+            'image': {
+                'link': 'https://example.com/product.jpg'
+            }
+        }
+    ),
+    'body_variables': fields.List(
+        fields.String(),
+        required=False,
+        description='Variables para el cuerpo del mensaje',
+        example=['Juan', 'ABC-123', '$29.99']
+    ),
+    'button_parameters': fields.List(
+        fields.Raw(),
+        required=False,
+        description='Parámetros para botones dinámicos',
+        example=[
+            {
+                'type': 'quick_reply',
+                'index': 0,
+                'payload': 'confirm_order_123'
+            }
+        ]
+    ),
+    'messaging_line_id': fields.Integer(
+        required=False,
+        description='ID de la línea de mensajería a utilizar',
+        example=1
+    )
+}
+
 # Definición de campos para respuesta de salud
 HEALTH_RESPONSE_FIELDS = {
     'status': fields.String(
