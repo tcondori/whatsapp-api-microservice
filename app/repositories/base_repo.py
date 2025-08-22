@@ -296,20 +296,21 @@ class MessagingLineRepository(BaseRepository):
         """
         Obtiene línea por ID
         Args:
-            line_id: ID de la línea (int o str que se puede convertir a int)
+            line_id: ID de la línea (puede ser int o str)
         Returns:
             Línea encontrada o None
         """
         try:
-            # Convertir a int si viene como string
-            if isinstance(line_id, str):
-                line_id = int(line_id)
-            elif not isinstance(line_id, int):
-                line_id = int(line_id)
+            # Buscar directamente como string (las line_ids en BD son strings)
+            # Si line_id es int, convertir a string para la búsqueda
+            if isinstance(line_id, int):
+                line_id_str = str(line_id)
+            else:
+                line_id_str = str(line_id)
             
-            result = self.model_class.query.filter_by(line_id=line_id).first()
+            result = self.model_class.query.filter_by(line_id=line_id_str).first()
             if result:
-                self.logger.debug(f"Encontrada línea: {line_id}")
+                self.logger.debug(f"Encontrada línea: {line_id_str}")
             return result
         except SQLAlchemyError as e:
             self.logger.error(f"Error obteniendo línea {line_id}: {e}")

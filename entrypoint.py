@@ -113,14 +113,14 @@ def _create_api(app: Flask) -> Api:
         ''',
         'doc': '/docs/',
         'authorizations': {
-            'apiKey': {
+            'ApiKeyAuth': {
                 'type': 'apiKey',
                 'in': 'header',
                 'name': 'X-API-Key',
-                'description': 'API Key para autenticación'
+                'description': 'API Key para autenticación. Usar: dev-api-key'
             }
         },
-        'security': 'apiKey'
+        'security': 'ApiKeyAuth'
     }
     
     # Agregar información adicional al config antes de crear la API

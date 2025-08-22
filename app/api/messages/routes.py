@@ -76,6 +76,7 @@ class TextMessageResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -130,6 +131,7 @@ class ImageMessageResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -185,6 +187,7 @@ class LocationMessageResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -283,6 +286,7 @@ class ContactsMessageResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -430,6 +434,7 @@ class InteractiveButtonsMessageResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -485,6 +490,7 @@ class InteractiveListMessageResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -540,6 +546,7 @@ class TemplateMessageResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -700,6 +707,7 @@ class TemplateTextMessageResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -802,6 +810,7 @@ class TemplateMediaMessageResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -929,6 +938,7 @@ class ImageUploadResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -1038,6 +1048,7 @@ class VideoUploadResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -1176,6 +1187,7 @@ class AudioUploadResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -1203,6 +1215,7 @@ class DocumentUploadResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -1235,6 +1248,7 @@ class StickerUploadResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def post(self):
         """
@@ -1268,6 +1282,7 @@ class MessageListResource(Resource):
     @messages_ns.response(400, 'Error de validación', error_response)
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def get(self):
         """
@@ -1328,6 +1343,7 @@ class MessageResource(Resource):
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(404, 'Mensaje no encontrado', error_response)
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def get(self, message_id):
         """
@@ -1377,6 +1393,7 @@ class WhatsAppMessageResource(Resource):
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(404, 'Mensaje no encontrado', error_response)
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def get(self, whatsapp_message_id):
         """
@@ -1423,6 +1440,7 @@ class MessageStatusResource(Resource):
     @messages_ns.response(401, 'No autorizado')
     @messages_ns.response(404, 'Mensaje no encontrado', error_response)
     @messages_ns.response(500, 'Error interno del servidor', error_response)
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def patch(self, whatsapp_message_id):
         """
@@ -1483,6 +1501,7 @@ class MessageTestResource(Resource):
     @messages_ns.doc('test_messages_api', security='ApiKeyAuth')
     @messages_ns.response(200, 'API de mensajes funcionando correctamente')
     @messages_ns.response(401, 'No autorizado')
+    @messages_ns.doc(security='ApiKeyAuth')
     @require_api_key
     def get(self):
         """
