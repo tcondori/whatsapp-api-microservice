@@ -291,26 +291,266 @@ def sanitize_filename(filename: str) -> str:
 def log_operation(operation: str, details: dict = None, level: str = 'info'):
     """
     Registra una operación en el log con formato consistente
+    Integrado con el sistema de logging estructurado
     Args:
         operation: Nombre de la operación
         details: Detalles adicionales
         level: Nivel de log (debug, info, warning, error)
     """
-    log_data = {
-        'operation': operation,
-        'timestamp': datetime.now(timezone.utc).isoformat()
+    try:
+        # Usar el sistema de logging estructurado si está disponible
+        from app.utils.logger import WhatsAppLogger
+        logger = WhatsAppLogger.get_logger(WhatsAppLogger.API_LOGGER)
+        
+        log_data = {
+            'operation': operation,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'event_type': 'operation_logged'
+        }
+        
+        if details:
+            log_data.update(details)
+        
+        # Usar el nivel apropiado
+        if level == 'debug':
+            logger.debug(f"Operation: {operation}", extra={'extra_data': log_data})
+        elif level == 'warning':
+            logger.warning(f"Operation: {operation}", extra={'extra_data': log_data})
+        elif level == 'error':
+            logger.error(f"Operation: {operation}", extra={'extra_data': log_data})
+        else:
+            logger.info(f"Operation: {operation}", extra={'extra_data': log_data})
+            
+    except ImportError:
+        # Fallback al logging estándar si el sistema estructurado no está disponible
+        logger = logging.getLogger('whatsapp_api.operations')
+        
+        log_data = {
+            'operation': operation,
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+        
+        if details:
+            log_data.update(details)
+        
+        if level == 'debug':
+            logger.debug(f"Operation: {json.dumps(log_data)}")
+        elif level == 'warning':
+            logger.warning(f"Operation: {json.dumps(log_data)}")
+        elif level == 'error':
+            logger.error(f"Operation: {json.dumps(log_data)}")
+        else:
+            logger.info(f"Operation: {json.dumps(log_data)}")
+
+
+def setup_request_context_logging():
+    """
+    Configura logging contextual para requests HTTP
+    Debe ser llamado desde Flask app context
+    """
+    try:
+        from flask import g
+        from app.utils.logger import WhatsAppLogger
+        import uuid
+        
+        # Generar ID único para el request si no existe
+        if not hasattr(g, 'request_id'):
+            g.request_id = str(uuid.uuid4())
+        
+        # Configurar logger con contexto
+        logger = WhatsAppLogger.get_logger(WhatsAppLogger.API_LOGGER)
+        
+        return logger
+        
+    except (ImportError, RuntimeError):
+        # No hay contexto de Flask disponible
+        return logging.getLogger('whatsapp_api')
+
+
+def get_sanitized_user_data(data: dict, sensitive_fields: List[str] = None) -> dict:
+    """
+    Sanitiza datos del usuario removiendo campos sensibles para logging
+    Args:
+        data: Datos a sanitizar
+        sensitive_fields: Lista de campos sensibles a remover/ocultar
+    Returns:
+        dict: Datos sanitizados
+    """
+    if not data:
+        return {}
+    
+    # Campos sensibles por defecto
+    default_sensitive_fields = [
+        'password', 'token', 'api_key', 'secret', 'authorization',
+        'credit_card', 'ssn', 'phone', 'email'
+    ]
+    
+    sensitive_fields = sensitive_fields or default_sensitive_fields
+    sanitized = data.copy()
+    
+    for field in sensitive_fields:
+        if field in sanitized:
+            if field == 'phone':
+                # Para teléfonos, usar formato sanitizado
+                sanitized[field] = format_phone_for_logging(sanitized[field])
+            elif field == 'email':
+                # Para emails, mostrar solo dominio
+                email = sanitized[field]
+                if '@' in email:
+                    domain = email.split('@')[1]
+                    sanitized[field] = f"***@{domain}"
+                else:
+                    sanitized[field] = "***"
+            else:
+                # Para otros campos sensibles, ocultar completamente
+                sanitized[field] = "***HIDDEN***"
+    
+    return sanitized
+
+
+def format_phone_for_logging(phone: str) -> str:
+    """
+    Formatea número de teléfono para logging seguro (oculta información personal)
+    Args:
+        phone: Número de teléfono
+    Returns:
+        str: Número formateado para logging
+    """
+    if not phone:
+        return ""
+    
+    # Remover caracteres no numéricos
+    clean_phone = ''.join(filter(str.isdigit, phone))
+    
+    if len(clean_phone) > 5:
+        # Mostrar solo primeros 3 y últimos 2 dígitos
+        return f"{clean_phone[:3]}***{clean_phone[-2:]}"
+    else:
+        return "****"
+
+
+def create_audit_log_entry(action: str, resource: str, user_id: str = None, 
+                          changes: dict = None, metadata: dict = None) -> dict:
+    """
+    Crea entrada estructurada para log de auditoría
+    Args:
+        action: Acción realizada (create, read, update, delete)
+        resource: Recurso afectado
+        user_id: ID del usuario que realizó la acción
+        changes: Cambios realizados
+        metadata: Metadatos adicionales
+    Returns:
+        dict: Entrada de auditoría estructurada
+    """
+    audit_entry = {
+        'audit_type': 'resource_action',
+        'action': action,
+        'resource': resource,
+        'user_id': user_id,
+        'timestamp': datetime.now(timezone.utc).isoformat(),
     }
     
-    if details:
-        log_data.update(details)
+    if changes:
+        audit_entry['changes'] = get_sanitized_user_data(changes)
     
-    logger = logging.getLogger('whatsapp_api.operations')
+    if metadata:
+        audit_entry['metadata'] = metadata
     
-    if level == 'debug':
-        logger.debug(f"Operation: {json.dumps(log_data)}")
-    elif level == 'warning':
-        logger.warning(f"Operation: {json.dumps(log_data)}")
-    elif level == 'error':
-        logger.error(f"Operation: {json.dumps(log_data)}")
-    else:
-        logger.info(f"Operation: {json.dumps(log_data)}")
+    return audit_entry
+
+
+def log_performance_metric(metric_name: str, value: float, unit: str = 'ms',
+                          tags: dict = None, threshold: float = None):
+    """
+    Registra métrica de performance con alertas automáticas
+    Args:
+        metric_name: Nombre de la métrica
+        value: Valor medido
+        unit: Unidad de medida
+        tags: Tags adicionales para la métrica
+        threshold: Umbral para generar alerta
+    """
+    try:
+        from app.utils.logger import WhatsAppLogger
+        from app.utils.events import EventType, Event, event_bus
+        from datetime import datetime
+        import asyncio
+        
+        perf_logger = WhatsAppLogger.get_logger(WhatsAppLogger.PERFORMANCE_LOGGER)
+        
+        metric_data = {
+            'metric_name': metric_name,
+            'value': value,
+            'unit': unit,
+            'tags': tags or {},
+            'timestamp': datetime.utcnow().isoformat(),
+            'event_type': 'performance_metric'
+        }
+        
+        # Determinar nivel de log basado en umbral
+        log_level = 'info'
+        if threshold and value > threshold:
+            log_level = 'warning'
+            metric_data['threshold_exceeded'] = True
+            metric_data['threshold'] = threshold
+        
+        # Registrar métrica
+        getattr(perf_logger, log_level)(
+            f"Performance metric: {metric_name}={value}{unit}",
+            extra={'extra_data': metric_data}
+        )
+        
+        # Emitir evento de performance si hay loop disponible
+        try:
+            loop = asyncio.get_event_loop()
+            loop.create_task(event_bus.publish(Event(
+                event_type=EventType.API_REQUEST_COMPLETED,
+                timestamp=datetime.utcnow(),
+                source='performance_monitor',
+                data=metric_data
+            )))
+        except RuntimeError:
+            pass
+            
+    except ImportError:
+        # Fallback a logging estándar
+        logger = logging.getLogger('performance')
+        logger.info(f"Performance: {metric_name}={value}{unit}")
+
+
+def create_structured_log_context(operation: str, user_id: str = None,
+                                 correlation_id: str = None) -> dict:
+    """
+    Crea contexto estructurado para logging consistente
+    Args:
+        operation: Operación being performed
+        user_id: ID del usuario
+        correlation_id: ID para correlacionar eventos relacionados
+    Returns:
+        dict: Contexto estructurado para logging
+    """
+    context = {
+        'operation': operation,
+        'timestamp': datetime.now(timezone.utc).isoformat(),
+    }
+    
+    if user_id:
+        context['user_id'] = user_id
+    
+    if correlation_id:
+        context['correlation_id'] = correlation_id
+    
+    # Agregar información de request si está disponible
+    try:
+        from flask import g, request
+        if hasattr(g, 'request_id'):
+            context['request_id'] = g.request_id
+        
+        if request:
+            context['endpoint'] = request.endpoint
+            context['method'] = request.method
+            
+    except (ImportError, RuntimeError):
+        pass
+    
+    return context

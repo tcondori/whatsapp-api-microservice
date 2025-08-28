@@ -1,0 +1,31 @@
+// Flujo de Recursos Humanos - Codificacion limpia
+// Manejo de consultas de empleados
+
+// TOPIC RANDOM - PUNTO DE ENTRADA PRINCIPAL
+> topic random
+
+// Saludo inicial y menu principal
++ (hola|hello|hi|buenos dias|buenas tardes|buenas noches|hey)
+- ¡Hola! 👋 Bienvenido a nuestro asistente virtual.<br><br>¿En que puedo ayudarte?<br><br>1️⃣ **Ventas** - Informacion de productos y servicios<br>2️⃣ **Soporte** - Ayuda tecnica y resolucion de problemas<br>3️⃣ **Recursos Humanos** - Consultas de empleados<br>4️⃣ **Facturacion** - Pagos y facturas<br>5️⃣ **Informacion general** - Horarios, ubicacion, contacto<br><br>Escribe el numero de la opcion o describe tu consulta.
+
+// Respuesta por defecto para entradas no reconocidas
++ *
+- Gracias por contactarnos. 😊<br><br>Para ayudarte mejor, puedes:<br><br>🔢 **Usar el menu:** Escribe numeros 1-5 para las opciones<br>💬 **Describir tu consulta:** Por ejemplo: "informacion de productos", "problema tecnico", etc.<br>👋 **Empezar:** Escribe "hola" para ver el menu completo<br><br>¿En que te puedo ayudar?
+
+// Opcion 3 - Recursos Humanos
++ [*] (3|tres|recursos humanos|rrhh|hr|empleado|trabajador|vacaciones|permiso|nomina|nómina|beneficios) [*]
+- ¡Hola! 👋 Soy tu asistente de **Recursos Humanos** 👥<br><br>¿En que puedo ayudarte hoy?<br><br>1️⃣ Solicitudes y permisos<br>2️⃣ Informacion sobre nomina<br>3️⃣ Beneficios y prestaciones<br>4️⃣ Politicas de la empresa<br>5️⃣ Capacitaciones y desarrollo<br>6️⃣ Contactar con RRHH<br><br>Escribe el numero o describe tu consulta.
+
+// Solicitudes y permisos
++ [*] (1|uno|solicitud|permiso|vacaciones|ausencia|licencia) [*]
+- 📋 **Solicitudes y Permisos**<br><br>**Tipos de solicitudes disponibles:**<br><br>🏖️ **Vacaciones**<br>• Vacaciones anuales<br>• Dias personales<br>• Dias por antiguedad<br><br>🏥 **Licencias medicas**<br>• Incapacidad temporal<br>• Citas medicas<br>• Emergencias familiares<br><br>👶 **Licencias especiales**<br>• Maternidad/Paternidad<br>• Matrimonio<br>• Duelo familiar<br><br>📄 **Otros tramites**<br>• Certificados laborales<br>• Cambio de datos<br>• Horarios flexibles<br><br>¿Que tipo de solicitud necesitas hacer?
+
+// Informacion de nomina
++ [*] (2|dos|nomina|nómina|sueldo|salario|pago|descuentos) [*]
+- 💰 **Informacion de Nomina**<br><br>**Consultas disponibles:**<br><br>📊 **Estado actual**<br>• Saldo pendiente<br>• Fecha proximo pago<br>• Descuentos aplicados<br><br>📈 **Historial**<br>• Ultimos 6 meses<br>• Certificaciones anuales<br>• Comparativo año anterior<br><br>🧾 **Documentos**<br>• Comprobantes de pago<br>• Certificados de ingresos<br>• Declaraciones fiscales<br><br>**¿Que informacion especifica necesitas?**<br>*Para consultas detalladas, necesitaras tu numero de empleado.*
+
+// Volver al menu principal
++ (menu principal|inicio|volver|salir)
+- Te llevo de vuelta al menu principal...<br><br>¿En que puedo ayudarte?<br><br>💬 **Conversacion general**<br>💰 **Ventas y precios**<br>🛠️ **Soporte tecnico**<br>👥 **Recursos humanos** (estuviste aqui)<br>💳 **Facturacion**<br><br>Selecciona un area o escribe tu consulta.
+
+< topic

@@ -1,0 +1,69 @@
+// Flujo de Recursos Humanos
+// Manejo de consultas de empleados
+
+// TOPIC RANDOM - PUNTO DE ENTRADA PRINCIPAL
+> topic random
+
+// Saludo inicial y menú principal
++ (hola|hello|hi|buenos dias|buenas tardes|buenas noches|hey)
+- ¡Hola! 👋 Bienvenido a nuestro asistente virtual.<br><br>¿En qué puedo ayudarte?<br><br>1️⃣ **Ventas** - Información de productos y servicios<br>2️⃣ **Soporte** - Ayuda técnica y resolución de problemas<br>3️⃣ **Recursos Humanos** - Consultas de empleados<br>4️⃣ **Facturación** - Pagos y facturas<br>5️⃣ **Información general** - Horarios, ubicación, contacto<br><br>Escribe el número de la opción o describe tu consulta.
+
+// Respuesta por defecto para entradas no reconocidas
++ *
+- Gracias por contactarnos. 😊<br><br>Para ayudarte mejor, puedes:<br><br>🔢 **Usar el menú:** Escribe números 1-5 para las opciones<br>💬 **Describir tu consulta:** Por ejemplo: "información de productos", "problema técnico", etc.<br>👋 **Empezar:** Escribe "hola" para ver el menú completo<br><br>¿En qué te puedo ayudar?
+
+// Opción 3 - Recursos Humanos
++ [*] (3|tres|recursos humanos|rrhh|hr|empleado|trabajador|vacaciones|permiso|nomina|nómina|beneficios) [*]
+- ¡Hola! 👋 Soy tu asistente de **Recursos Humanos** 👥<br><br>¿En qué puedo ayudarte hoy?<br><br>1️⃣ Solicitudes y permisos<br>2️⃣ Información sobre nómina<br>3️⃣ Beneficios y prestaciones<br>4️⃣ Políticas de la empresa<br>5️⃣ Capacitaciones y desarrollo<br>6️⃣ Contactar con RRHH<br><br>Escribe el número o describe tu consulta.
+
+// Solicitudes y permisos
++ [*] (1|uno|solicitud|permiso|vacaciones|ausencia|licencia) [*]
+- 📋 **Solicitudes y Permisos**<br><br>**Tipos de solicitudes disponibles:**<br><br>🏖️ **Vacaciones**<br>• Vacaciones anuales<br>• Días personales<br>• Días por antigüedad<br><br>🏥 **Licencias médicas**<br>• Incapacidad temporal<br>• Citas médicas<br>• Emergencias familiares<br><br>👶 **Licencias especiales**<br>• Maternidad/Paternidad<br>• Matrimonio<br>• Duelo familiar<br><br>📄 **Otros trámites**<br>• Certificados laborales<br>• Cambio de datos<br>• Horarios flexibles<br><br>¿Qué tipo de solicitud necesitas hacer?
+
+// Información de nómina
++ [*] (2|dos|nomina|nómina|sueldo|salario|pago|descuentos) [*]
+- 💰 **Información de Nómina**<br><br>**Consultas disponibles:**<br><br>📊 **Estado actual**<br>• Saldo pendiente<br>• Fecha próximo pago<br>• Descuentos aplicados<br><br>📈 **Historial**<br>• Últimos 6 meses<br>• Certificaciones anuales<br>• Comparativo año anterior<br><br>🧾 **Documentos**<br>• Comprobantes de pago<br>• Certificados de ingresos<br>• Declaraciones fiscales<br><br>**¿Qué información específica necesitas?**<br>*Para consultas detalladas, necesitarás tu número de empleado.*
+
+// Beneficios y prestaciones
++ [*] (3|tres|beneficios|prestaciones|seguro|pension|pensión|salud) [*]
+- 🎁 **Beneficios y Prestaciones**<br><br>**Tus beneficios incluyen:**<br><br>🏥 **Salud**<br>• Seguro médico familiar<br>• Descuentos en farmacias<br>• Chequeos médicos anuales<br>• Programa de bienestar<br><br>💼 **Profesionales**<br>• Capacitaciones gratuitas<br>• Certificaciones pagadas<br>• Plan de carrera<br>• Mentorías internas<br><br>🎯 **Calidad de vida**<br>• Horarios flexibles<br>• Trabajo remoto<br>• Días de cumpleaños<br>• Actividades recreativas<br><br>💰 **Económicos**<br>• Bonos por performance<br>• Prima de antiguedad<br>• Fondo de ahorro<br>• Préstamos de emergencia<br><br>¿Sobre cuál quieres más información?
+
+// Políticas de la empresa
++ [*] (4|cuatro|politicas|políticas|reglas|normas|codigo|código|conducta) [*]
+- 📜 **Políticas de la Empresa**<br><br>**Documentos importantes:**<br><br>⚖️ **Código de Conducta**<br>• Valores corporativos<br>• Comportamiento profesional<br>• Diversidad e inclusión<br>• Política anti-acoso<br><br>🕐 **Horarios y Asistencia**<br>• Horario oficial: 9:00 - 18:00<br>• Flexibilidad: ±1 hora<br>• Trabajo remoto: 2 días/semana<br>• Política de puntualidad<br><br>📱 **Uso de Tecnología**<br>• Redes sociales en trabajo<br>• Uso de dispositivos personales<br>• Seguridad de información<br>• BYOD (Bring Your Own Device)<br><br>🚫 **Prohibiciones**<br>• Sustancias prohibidas<br>• Conflictos de interés<br>• Información confidencial<br><br>¿Necesitas detalles sobre alguna política específica?
+
+// Capacitaciones y desarrollo
++ [*] (5|cinco|capacitacion|capacitación|entrenamiento|desarrollo|curso|aprendizaje) [*]
+- 📚 **Capacitaciones y Desarrollo**<br><br>**Programas disponibles:**<br><br>💡 **Habilidades Técnicas**<br>• Certificaciones Microsoft/Google<br>• Programación y desarrollo<br>• Análisis de datos<br>• Cyberseguridad<br><br>🎯 **Habilidades Blandas**<br>• Liderazgo y gestión<br>• Comunicación efectiva<br>• Trabajo en equipo<br>• Negociación<br><br>🌟 **Desarrollo Personal**<br>• Gestión del tiempo<br>• Inteligencia emocional<br>• Creatividad e innovación<br>• Resolución de conflictos<br><br>📖 **Idiomas**<br>• Inglés empresarial<br>• Otros idiomas bajo demanda<br><br>**💰 La empresa cubre 100% de capacitaciones aprobadas**<br><br>¿Qué área te interesa desarrollar?
+
+// Contactar con RRHH
++ [*] (6|seis|contactar|contacto|humano|persona|rrhh) [*]
+- 👤 **Contacto Directo con RRHH**<br><br>**Canales de contacto:**<br><br>📧 **Email oficial:** rrhh@empresa.com<br>📞 **Teléfono directo:** +1-234-567-8900 ext. 101<br>🏢 **Oficina:** Piso 3, Oficina 301<br><br>**Horarios de atención:**<br>📅 Lunes a Viernes: 8:00 - 17:00<br>📅 Almuerzo: 12:00 - 13:00 (cerrado)<br><br>**Para citas presenciales:**<br>🗓️ Agenda online: portal.empresa.com/rrhh<br>⚡ Urgencias: Extensión 911 (interno)<br><br>**¿Tu consulta es?**<br>🟢 **Normal** - Respuesta en 24-48 horas<br>🟡 **Urgente** - Respuesta en 4-8 horas<br>🔴 **Crítica** - Atención inmediata<br><br>Selecciona la prioridad de tu consulta.
+
+// Solicitudes específicas
++ [*] (vacaciones|vacation|holidays) [*]
+- 🏖️ **Solicitud de Vacaciones**<br><br>**Información importante:**<br>• Días disponibles: Consulta tu portal de empleado<br>• Solicitud mínima: 5 días hábiles de anticipación<br>• Máximo continuo: 15 días hábiles<br>• Períodos restringidos: Diciembre, fin de mes<br><br>**Para solicitar:**<br>1️⃣ Accede al portal del empleado<br>2️⃣ Sección "Mis Solicitudes"<br>3️⃣ Nueva solicitud > Vacaciones<br>4️⃣ Selecciona fechas y adjunta justificación<br>5️⃣ Envía para aprobación<br><br>**¿Necesitas ayuda con algún paso específico?**<br>• Acceso al portal<br>• Cálculo de días disponibles<br>• Justificación de fechas<br>• Estado de solicitudes anteriores
+
++ [*] (certificado|constancia|carta|laboral|trabajo) [*]
+- 📄 **Certificados Laborales**<br><br>**Tipos disponibles:**<br><br>✅ **Certificado de ingresos**<br>• Para trámites bancarios<br>• Tiempo de entrega: 2-3 días<br><br>✅ **Constancia de trabajo**<br>• Empleo actual y funciones<br>• Tiempo de entrega: 1-2 días<br><br>✅ **Carta de recomendación**<br>• Para nuevos empleos<br>• Tiempo de entrega: 3-5 días<br>• Requiere aprobación gerencial<br><br>**¿Qué tipo de certificado necesitas?**<br>También indícame para qué lo vas a usar para personalizar el contenido.
+
++ [*] (cambio|actualizar|datos|direccion|dirección|telefono|teléfono) [*]
+- ✏️ **Actualización de Datos Personales**<br><br>**Datos que puedes cambiar:**<br><br>🏠 **Información básica**<br>• Dirección de residencia<br>• Teléfonos de contacto<br>• Email personal<br>• Estado civil<br><br>👨‍👩‍👧‍👦 **Información familiar**<br>• Beneficiarios de seguros<br>• Contactos de emergencia<br>• Dependientes económicos<br><br>💳 **Información bancaria**<br>• Cuenta para nómina<br>• Datos para reembolsos<br><br>**Para actualizar:**<br>• Accede al portal del empleado<br>• Sección "Mi Perfil"<br>• Algunos cambios requieren documentos de soporte<br><br>¿Qué información necesitas actualizar?
+
+// Respuestas sobre nómina específicas
++ [*] (cuando|cuándo|fecha|pago|deposito|depósito) [*]
+- 💳 **Fechas de Pago**<br><br>**Calendario de nómina:**<br>📅 **Sueldo mensual:** Último día hábil del mes<br>📅 **Prima de antigüedad:** 15 de diciembre<br>📅 **Bonos de performance:** 31 de enero<br>📅 **Utilidades:** 31 de marzo<br><br>**¿El pago no llegó?**<br>Posibles causas:<br>• Cambio de cuenta bancaria pendiente<br>• Datos bancarios incorrectos<br>• Feriados bancarios (se paga día anterior)<br><br>**Próximo pago programado:** {<call>next_payday</call>}<br><br>Si no recibiste tu pago esperado, contacta RRHH inmediatamente.
+
++ [*] (descuento|descuentos|deducciones|impuestos) [*]
+- 📊 **Descuentos en Nómina**<br><br>**Descuentos obligatorios:**<br>🏛️ Impuesto sobre la renta: Variable según ingresos<br>🏥 Seguro social: 4% del salario bruto<br>💼 Fondo de pensiones: 6% del salario bruto<br><br>**Descuentos voluntarios:**<br>💰 Fondo de ahorro: 5-10% (tú eliges)<br>🚗 Préstamo de vehículo: Según plan<br>🏠 Préstamo hipotecario: Según plan<br><br>**¿Tienes dudas sobre algún descuento específico?**<br>Puedo explicarte cómo se calcula o cómo modificarlo si es voluntario.
+
+// Navegación y cierre
++ [*] (gracias|thank you|perfecto|excelente|resuelto|ya entendi|ya entendí) [*]
+- ¡Excelente! 😊 Me da mucho gusto haber podido ayudarte con tu consulta de RRHH.<br><br>**Recuerda:**<br>• Portal del empleado: portal.empresa.com<br>• RRHH directo: rrhh@empresa.com<br>• Teléfono: ext. 101<br><br>**¿Necesitas algo más?**<br>🔄 Otra consulta de RRHH<br>📞 Contacto directo con el equipo<br>🏠 Volver al menú principal<br><br>¡Que tengas un excelente día! 👋
+
+< topic
+
++ (menu principal|inicio|volver|salir)
+- Te llevo de vuelta al menú principal...<br><br>¿En qué puedo ayudarte?<br><br>💬 **Conversación general**<br>💰 **Ventas y precios**<br>🛠️ **Soporte técnico**<br>👥 **Recursos humanos** (estuviste aquí)<br>💳 **Facturación**<br><br>Selecciona un área o escribe tu consulta.
+
+< topic

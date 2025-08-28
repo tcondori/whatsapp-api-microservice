@@ -64,7 +64,81 @@ class DefaultConfig:
     # Configuración de API Keys válidas
     VALID_API_KEYS = os.getenv('VALID_API_KEYS', '').split(',')
     
+    # === CONFIGURACIÓN CHATBOT ===
+    
+    # Control principal del chatbot
+    CHATBOT_ENABLED = os.getenv('CHATBOT_ENABLED', 'true').lower() == 'true'  # Habilitado por defecto
+    
+    # Configuración de RiveScript
+    RIVESCRIPT_DEBUG = os.getenv('RIVESCRIPT_DEBUG', 'false').lower() == 'true'
+    RIVESCRIPT_UTF8 = True
+    RIVESCRIPT_FLOWS_DIR = os.getenv('RIVESCRIPT_FLOWS_DIR', 'static/rivescript')
+    
+    # Configuración de LLM (fallback)
+    CHATBOT_FALLBACK_TO_LLM = os.getenv('CHATBOT_FALLBACK_TO_LLM', 'false').lower() == 'true'
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+    LLM_MODEL = os.getenv('LLM_MODEL', 'gpt-3.5-turbo')
+    LLM_MAX_TOKENS = int(os.getenv('LLM_MAX_TOKENS', '150'))
+    LLM_TEMPERATURE = float(os.getenv('LLM_TEMPERATURE', '0.7'))
+    
+    # Configuración de contexto y sesiones
+    CHATBOT_MAX_CONTEXT_MESSAGES = int(os.getenv('CHATBOT_MAX_CONTEXT_MESSAGES', '10'))
+    CHATBOT_SESSION_TIMEOUT_HOURS = int(os.getenv('CHATBOT_SESSION_TIMEOUT_HOURS', '24'))
+    CHATBOT_MAX_PROCESSING_TIME_MS = int(os.getenv('CHATBOT_MAX_PROCESSING_TIME_MS', '5000'))
+    
+    # Configuración de respuestas automáticas
+    CHATBOT_AUTO_RESPOND_TO_GREETINGS = os.getenv('CHATBOT_AUTO_RESPOND_TO_GREETINGS', 'true').lower() == 'true'
+    CHATBOT_AUTO_RESPOND_TO_QUESTIONS = os.getenv('CHATBOT_AUTO_RESPOND_TO_QUESTIONS', 'true').lower() == 'true'
+    
     @staticmethod
+    def is_chatbot_available():
+        """
+        Verifica si el chatbot está disponible y configurado correctamente
+        Returns:
+            bool: True si el chatbot puede funcionar
+        """
+        if not DefaultConfig.CHATBOT_ENABLED:
+            return False
+        
+        # Verificar que exista el directorio de flujos
+        import os
+        flows_dir = DefaultConfig.RIVESCRIPT_FLOWS_DIR
+        if not os.path.exists(flows_dir):
+            return False
+        
+        return True
+    
+    @staticmethod
+    def get_chatbot_config():
+        """
+        Obtiene la configuración completa del chatbot
+        Returns:
+            dict: Configuración del chatbot
+        """
+        return {
+            'enabled': DefaultConfig.CHATBOT_ENABLED,
+            'rivescript': {
+                'debug': DefaultConfig.RIVESCRIPT_DEBUG,
+                'utf8': DefaultConfig.RIVESCRIPT_UTF8,
+                'flows_dir': DefaultConfig.RIVESCRIPT_FLOWS_DIR
+            },
+            'llm': {
+                'enabled': DefaultConfig.CHATBOT_FALLBACK_TO_LLM,
+                'api_key_configured': bool(DefaultConfig.OPENAI_API_KEY.strip()),
+                'model': DefaultConfig.LLM_MODEL,
+                'max_tokens': DefaultConfig.LLM_MAX_TOKENS,
+                'temperature': DefaultConfig.LLM_TEMPERATURE
+            },
+            'session': {
+                'max_context_messages': DefaultConfig.CHATBOT_MAX_CONTEXT_MESSAGES,
+                'timeout_hours': DefaultConfig.CHATBOT_SESSION_TIMEOUT_HOURS,
+                'max_processing_time_ms': DefaultConfig.CHATBOT_MAX_PROCESSING_TIME_MS
+            },
+            'auto_respond': {
+                'greetings': DefaultConfig.CHATBOT_AUTO_RESPOND_TO_GREETINGS,
+                'questions': DefaultConfig.CHATBOT_AUTO_RESPOND_TO_QUESTIONS
+            }
+        }
     def get_messaging_lines():
         """
         Obtiene las líneas de mensajería configuradas

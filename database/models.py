@@ -308,3 +308,107 @@ db.Index('idx_messages_status_direction', Message.status, Message.direction)
 db.Index('idx_webhook_events_type_processed', WebhookEvent.event_type, WebhookEvent.processed)
 db.Index('idx_contacts_last_seen', Contact.last_seen)
 db.Index('idx_media_files_type_downloaded', MediaFile.file_type, MediaFile.downloaded)
+
+
+class ConversationFlow(BaseModel):
+    """Modelo para flujos de conversación con RiveScript"""
+    __tablename__ = 'conversation_flows'
+    
+    name = db.Column(db.String(100), nullable=False, comment='Nombre del flujo')
+    description = db.Column(db.Text, comment='Descripción del flujo')
+    rivescript_content = db.Column(db.Text, nullable=False, comment='Contenido .rive')
+    is_active = db.Column(db.Boolean, default=False, comment='Si está activo')
+    is_default = db.Column(db.Boolean, default=False, comment='Si es el flujo por defecto')
+    priority = db.Column(db.Integer, default=1, comment='Prioridad (menor número = mayor prioridad)')
+    
+    # Configuración del chatbot
+    fallback_to_llm = db.Column(db.Boolean, default=True, comment='Si usar LLM como fallback')
+    max_context_messages = db.Column(db.Integer, default=5, comment='Máximo de mensajes en contexto')
+    
+    # Estadísticas
+    usage_count = db.Column(db.Integer, default=0, comment='Veces que se ha usado')
+    last_used = db.Column(db.DateTime, comment='Última vez usado')
+    
+    def to_dict(self):
+        """Convierte el modelo a diccionario"""
+        data = super().to_dict()
+        data.update({
+            'name': self.name,
+            'description': self.description,
+            'rivescript_content': self.rivescript_content,
+            'is_active': self.is_active,
+            'is_default': self.is_default,
+            'priority': self.priority,
+            'fallback_to_llm': self.fallback_to_llm,
+            'max_context_messages': self.max_context_messages,
+            'usage_count': self.usage_count,
+            'last_used': self.last_used.isoformat() if self.last_used else None
+        })
+        return data
+
+class ConversationContext(BaseModel):
+    """Modelo para contexto de conversaciones de usuarios"""
+    __tablename__ = 'conversation_contexts'
+    
+    phone_number = db.Column(db.String(20), nullable=False, unique=True, comment='Número de teléfono del usuario')
+    current_topic = db.Column(db.String(100), comment='Tema actual de conversación')
+    context_data = db.Column(db.JSON, comment='Variables de contexto del usuario')
+    last_interaction = db.Column(db.DateTime, default=datetime.utcnow, comment='Última interacción')
+    flow_id = db.Column(db.Integer, db.ForeignKey('conversation_flows.id'), comment='Flujo actual')
+    session_count = db.Column(db.Integer, default=1, comment='Número de sesiones')
+    
+    # Relación con flujo
+    flow = db.relationship('ConversationFlow', backref='contexts')
+    
+    def to_dict(self):
+        """Convierte el modelo a diccionario"""
+        data = super().to_dict()
+        data.update({
+            'phone_number': self.phone_number,
+            'current_topic': self.current_topic,
+            'context_data': self.context_data or {},
+            'last_interaction': self.last_interaction.isoformat() if self.last_interaction else None,
+            'flow_id': self.flow_id,
+            'session_count': self.session_count,
+            'flow_name': self.flow.name if self.flow else None
+        })
+        return data
+
+class ChatbotInteraction(BaseModel):
+    """Modelo para registrar interacciones del chatbot"""
+    __tablename__ = 'chatbot_interactions'
+    
+    phone_number = db.Column(db.String(20), nullable=False, comment='Número de teléfono')
+    user_message = db.Column(db.Text, nullable=False, comment='Mensaje entrante del usuario')
+    bot_response = db.Column(db.Text, comment='Mensaje de respuesta del bot')
+    intent = db.Column(db.String(100), comment='Intención detectada')
+    confidence_score = db.Column(db.Numeric(3,2), comment='Puntuación de confianza')
+    flow_id = db.Column(UUID(as_uuid=True), db.ForeignKey('conversation_flows.id'), comment='Flujo usado')
+    context_id = db.Column(UUID(as_uuid=True), db.ForeignKey('conversation_contexts.id'), comment='Contexto de conversación')
+    processing_time_ms = db.Column(db.Integer, comment='Tiempo de procesamiento en ms')
+    
+    # Relaciones
+    flow = db.relationship('ConversationFlow')
+    context = db.relationship('ConversationContext')
+    
+    def to_dict(self):
+        """Convierte el modelo a diccionario"""
+        data = super().to_dict()
+        data.update({
+            'phone_number': self.phone_number,
+            'user_message': self.user_message[:100] + '...' if len(self.user_message) > 100 else self.user_message,
+            'bot_response': self.bot_response[:100] + '...' if self.bot_response and len(self.bot_response) > 100 else self.bot_response,
+            'intent': self.intent,
+            'confidence_score': float(self.confidence_score) if self.confidence_score else None,
+            'processing_time_ms': self.processing_time_ms,
+            'flow_id': str(self.flow_id) if self.flow_id else None,
+            'context_id': str(self.context_id) if self.context_id else None,
+            'flow_name': self.flow.name if self.flow else None
+        })
+        return data
+
+# Índices adicionales para los modelos del chatbot
+db.Index('idx_conversation_context_phone_number', ConversationContext.phone_number)
+db.Index('idx_conversation_context_last_interaction', ConversationContext.last_interaction)
+db.Index('idx_chatbot_interactions_phone_created', ChatbotInteraction.phone_number, ChatbotInteraction.created_at)
+db.Index('idx_chatbot_interactions_intent', ChatbotInteraction.intent)

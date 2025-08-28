@@ -1,0 +1,235 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Chat Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .chat-container {
+            width: 400px;
+            height: 600px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-header {
+            background: #25D366;
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+        }
+        .flow-selector {
+            margin-bottom: 10px;
+        }
+        .flow-selector select {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
+            width: 100%;
+        }
+        .flow-selector select option {
+            background: #25D366;
+            color: white;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f0f0f0;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        .user-message {
+            background: #DCF8C6;
+            margin-left: auto;
+            text-align: right;
+        }
+        .bot-message {
+            background: white;
+            margin-right: auto;
+        }
+        .chat-input {
+            display: flex;
+            padding: 20px;
+            background: white;
+        }
+        .message-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+        }
+        .send-button {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 20px;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        .send-button:hover {
+            background: #20b358;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>🤖 WhatsApp Bot</h2>
+            <div class="flow-selector">
+                <select id="flowSelector" onchange="changeFlow()">
+                    <option value="">🔄 Cargando flujos...</option>
+                </select>
+            </div>
+            <p id="flowDescription">Simulador de Chat</p>
+        </div>
+        <div class="chat-messages" id="messages">
+            <div class="message bot-message">
+                ¡Hola! Bienvenido al simulador de WhatsApp. 
+                Prueba escribir "soporte tecnico" para ver todas las opciones disponibles.
+            </div>
+        </div>
+        <div class="chat-input">
+            <input type="text" class="message-input" id="messageInput" placeholder="Escribe tu mensaje..." />
+            <button class="send-button" onclick="sendMessage()">Enviar</button>
+        </div>
+    </div>
+
+    <script>
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Agregar mensaje del usuario
+            addMessage(message, 'user');
+            input.value = '';
+            
+            // Obtener flujo seleccionado
+            const selectedFlow = document.getElementById('flowSelector').value;
+            
+            // Enviar al servidor
+            fetch('/send-message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    message: message,
+                    flow_id: selectedFlow || null
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    addMessage(data.bot_message.text, 'bot');
+                } else {
+                    addMessage('Error: ' + data.message, 'bot');
+                }
+            })
+            .catch(error => {
+                addMessage('Error de conexión', 'bot');
+            });
+        }
+        
+        // Cargar flujos disponibles
+        async function loadFlows() {
+            try {
+                const response = await fetch('/rivescript/flows');
+                if (response.ok) {
+                    const data = await response.json();
+                    const selector = document.getElementById('flowSelector');
+                    
+                    // Limpiar opciones
+                    selector.innerHTML = '<option value="">🎯 Seleccionar flujo de prueba...</option>';
+                    
+                    // Agregar flujos activos
+                    data.flows.filter(f => f.is_active).forEach(flow => {
+                        const option = document.createElement('option');
+                        option.value = flow.id;
+                        option.textContent = `${flow.name} ${flow.is_default ? '(Por defecto)' : ''}`;
+                        selector.appendChild(option);
+                    });
+                    
+                    // Seleccionar flujo por defecto si existe
+                    const defaultFlow = data.flows.find(f => f.is_default && f.is_active);
+                    if (defaultFlow) {
+                        selector.value = defaultFlow.id;
+                        changeFlow();
+                    }
+                } else {
+                    console.error('Error cargando flujos:', response.status);
+                }
+            } catch (error) {
+                console.error('Error de conexión cargando flujos:', error);
+            }
+        }
+        
+        // Cambiar flujo seleccionado
+        function changeFlow() {
+            const selector = document.getElementById('flowSelector');
+            const selectedId = selector.value;
+            const selectedText = selector.options[selector.selectedIndex].text;
+            
+            const description = document.getElementById('flowDescription');
+            
+            if (selectedId) {
+                description.textContent = `Probando: ${selectedText}`;
+                
+                // Limpiar chat y mostrar mensaje de cambio
+                const messages = document.getElementById('messages');
+                messages.innerHTML = '';
+                addMessage(`🔄 Cambiado al flujo: ${selectedText}`, 'bot');
+                addMessage('¡Hola! Puedes comenzar a probar este flujo.', 'bot');
+            } else {
+                description.textContent = 'Selecciona un flujo para probar';
+            }
+        }
+        
+        // Inicializar al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            loadFlows();
+        });
+        
+        function addMessage(text, type) {
+            const messages = document.getElementById('messages');
+            const div = document.createElement('div');
+            div.className = `message ${type}-message`;
+            div.innerHTML = text.replace(/\n/g, '<br>');
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+        
+        // Enviar con Enter
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

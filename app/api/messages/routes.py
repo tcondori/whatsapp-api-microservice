@@ -10,6 +10,30 @@ from app.private.auth import require_api_key
 from app.utils.exceptions import ValidationError, MessageSendError, LineNotFoundError, MessageNotFoundError
 from app.utils.helpers import create_error_response
 
+# Importar sistema de logging
+from app.utils.logger import WhatsAppLogger, EventLogger
+from app.utils.events import EventBus, Event, EventType
+import time
+
+# Función auxiliar para sanitizar números de teléfono
+def sanitize_phone_number(phone_number: str) -> str:
+    """Sanitiza números de teléfono para logging (mantiene privacidad)"""
+    if not phone_number or phone_number.strip() == '':
+        return None if phone_number is None else ''
+    
+    clean_phone = phone_number.strip()
+    
+    # Si es muy corto, no es un número válido
+    if len(clean_phone) < 7:
+        return f"****{clean_phone[-2:]}" if len(clean_phone) >= 2 else "****"
+    
+    # Formato: mostrar país y últimos 4 dígitos
+    # Ejemplo: +1234567890 -> +123****7890
+    if len(clean_phone) > 8:
+        return f"{clean_phone[:4]}****{clean_phone[-4:]}"
+    else:
+        return f"****{clean_phone[-4:]}"
+
 # Importar definiciones de campos
 from app.api.messages.models import (
     TEXT_MESSAGE_FIELDS, MESSAGE_RESPONSE_FIELDS, UPDATE_STATUS_FIELDS,
@@ -61,8 +85,22 @@ message_list_response = messages_ns.model('MessageListResponse', {
     )
 })
 
-# Inicializar servicio
+# Inicializar servicio y sistema de logging con configuración dual
 message_service = MessageService()
+
+# Configurar logging dual: terminal (colores) + archivos (JSON)
+WhatsAppLogger.configure_logging(
+    log_level='INFO',
+    environment='development',  # Usar development para colores en terminal
+    use_date_structure=False,   # Usar sistema simple
+    dual_output=True           # HABILITADO: logs en terminal + archivos
+)
+
+# Obtener loggers especializados
+api_logger = WhatsAppLogger.get_logger(WhatsAppLogger.API_LOGGER)
+service_logger = WhatsAppLogger.get_logger(WhatsAppLogger.SERVICE_LOGGER)
+event_logger = EventLogger()
+# event_bus = EventBus()  # Por ahora comentado para evitar errores
 
 @messages_ns.route('/text')
 class TextMessageResource(Resource):
@@ -96,23 +134,82 @@ class TextMessageResource(Resource):
                     error_code="MISSING_DATA"
                 )
             
+            # LOG DUAL - INICIO: Terminal simple + Archivo estructurado
+            phone_number = message_data.get('to', 'no_especificado')
+            api_logger.info(f"Procesando mensaje de texto", extra={
+                'extra_data': {
+                    'endpoint': '/v1/messages/text',
+                    'method': 'POST',
+                    'phone_number': sanitize_phone_number(phone_number),
+                    'message_type': 'text',
+                    'event_type': 'message_request_start'
+                }
+            })
+            
             # Enviar mensaje usando el servicio
             result = message_service.send_text_message(message_data)
+            
+            # LOG DUAL - ÉXITO: Terminal simple + Archivo estructurado
+            message_id = result.get('data', {}).get('whatsapp_message_id', 'unknown')
+            api_logger.info(f"Mensaje de texto enviado exitosamente", extra={
+                'extra_data': {
+                    'endpoint': '/v1/messages/text',
+                    'phone_number': sanitize_phone_number(phone_number),
+                    'message_id': message_id,
+                    'message_type': 'text',
+                    'status_code': 200,
+                    'event_type': 'message_request_success'
+                }
+            })
             
             # Devolver respuesta exitosa
             return result
             
         except ValidationError as e:
+            # LOG DUAL - ERROR VALIDACIÓN: Terminal simple + Archivo estructurado
+            api_logger.error(f"Error de validación en mensaje de texto", extra={
+                'extra_data': {
+                    'endpoint': '/v1/messages/text',
+                    'error_type': 'validation_error',
+                    'error_message': str(e),
+                    'phone_number': message_data.get('to', 'unknown') if 'message_data' in locals() else 'unknown',
+                    'event_type': 'message_request_error'
+                }
+            })
+            
             messages_ns.abort(400,
                 message=str(e),
                 error_code="VALIDATION_ERROR"
             )
         except (MessageSendError, LineNotFoundError) as e:
+            # LOG DUAL - ERROR SERVICIO: Terminal simple + Archivo estructurado  
+            api_logger.error(f"Error de servicio de mensajería", extra={
+                'extra_data': {
+                    'endpoint': '/v1/messages/text',
+                    'error_type': 'service_error',
+                    'error_message': str(e),
+                    'phone_number': message_data.get('to', 'unknown') if 'message_data' in locals() else 'unknown',
+                    'event_type': 'message_request_error'
+                }
+            })
+            
             messages_ns.abort(400,
                 message=str(e),
                 error_code="MESSAGE_SEND_ERROR"
             )
         except Exception as e:
+            # LOG DUAL - ERROR CRÍTICO: Terminal simple + Archivo estructurado
+            api_logger.critical(f"Error interno crítico en mensaje de texto", extra={
+                'extra_data': {
+                    'endpoint': '/v1/messages/text',
+                    'error_type': 'critical_error',
+                    'error_message': str(e),
+                    'phone_number': message_data.get('to', 'unknown') if 'message_data' in locals() else 'unknown',
+                    'event_type': 'message_request_critical_error',
+                    'requires_attention': True
+                }
+            })
+            
             messages_ns.abort(500,
                 message="Error interno del servidor",
                 error_code="INTERNAL_ERROR",
@@ -1510,42 +1607,41 @@ class MessageTestResource(Resource):
         Devuelve información básica sobre el estado del servicio de mensajes.
         """
         try:
-            # Obtener estadísticas básicas
-            total_messages = len(message_service.msg_repo.get_all())
-            available_lines = len([line for line in message_service.line_repo.get_all() if line.is_active])
+            # LOG DUAL - INFO: Terminal simple + Archivo estructurado
+            api_logger.info("Endpoint de prueba ejecutado exitosamente", extra={
+                'extra_data': {
+                    'endpoint': '/v1/messages/test',
+                    'method': 'GET',
+                    'message_type': 'test',
+                    'event_type': 'test_request'
+                }
+            })
             
+            # Devolver información básica sin acceder a la base de datos
             return {
                 'success': True,
                 'message': 'API de mensajes funcionando correctamente',
                 'data': {
                     'service_status': 'active',
-                    'total_messages': total_messages,
-                    'available_lines': available_lines,
+                    'api_version': '1.0',
+                    'logging_system': 'dual_output_enabled',
                     'supported_endpoints': [
                         'POST /v1/messages/text - Enviar mensaje de texto',
                         'POST /v1/messages/image - Enviar mensaje de imagen (URL directa o media_id)',
                         'POST /v1/messages/location - Enviar mensaje de ubicación',
                         'POST /v1/messages/contacts - Enviar mensaje de contactos (vCard)',
-                        'POST /v1/messages/interactive/buttons - Enviar mensaje interactivo con botones (hasta 3)',
-                        'POST /v1/messages/interactive/list - Enviar mensaje interactivo con lista (hasta 10 opciones)',
-                        'POST /v1/messages/template - Enviar mensaje de plantilla con variables (formato oficial)',
-                        'POST /v1/messages/template/text - Enviar plantilla de texto (interfaz simplificada)',
-                        'POST /v1/messages/template/media - Enviar plantilla multimedia con botones dinámicos',
-                        'POST /v1/messages/image/upload - Subir archivo y enviar imagen (Caso 2: media_id)',
-                        'POST /v1/messages/video/upload - Subir archivo y enviar video',
-                        'POST /v1/messages/audio/upload - Subir archivo y enviar audio',
-                        'POST /v1/messages/document/upload - Subir archivo y enviar documento',
-                        'POST /v1/messages/sticker/upload - Subir archivo y enviar sticker',
-                        'GET /v1/messages - Listar mensajes con filtros',
-                        'GET /v1/messages/{id} - Obtener mensaje por ID',
-                        'GET /v1/messages/whatsapp/{whatsapp_id} - Obtener por ID de WhatsApp',
-                        'PATCH /v1/messages/whatsapp/{whatsapp_id}/status - Actualizar estado'
-                    ]
+                        'GET /v1/messages/test - Endpoint de prueba'
+                    ],
+                    'authentication': {
+                        'method': 'API Key',
+                        'header': 'X-API-Key'
+                    },
+                    'timestamp': time.time()
                 }
             }
             
         except Exception as e:
-            api.abort(500, 
+            messages_ns.abort(500, 
                 message="Error verificando estado del servicio",
                 error_code="SERVICE_ERROR",
                 details=str(e)

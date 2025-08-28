@@ -5,6 +5,8 @@
         }
     ],
     "settings": {
-        "postman.settings.dotenv-detection-notification-visibility": false
+        "postman.settings.dotenv-detection-notification-visibility": false,
+        "github.copilot.chat.commitMessageGeneration.instructions": [],
+        "github.copilot.chat.reviewSelection.instructions": []
     }
 }

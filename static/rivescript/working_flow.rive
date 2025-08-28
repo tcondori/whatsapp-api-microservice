@@ -1,0 +1,49 @@
+// Flujo basico para WhatsApp API - Funcionando
+! version = 2.0
+
+> topic random
+
+    // Saludo inicial
+    + hola
+    - Hola! Bienvenido a nuestro asistente virtual.
+    - ¿En que puedo ayudarte?
+    - 1. Ventas - Informacion de productos
+    - 2. Soporte - Ayuda tecnica  
+    - 3. Recursos Humanos - Consultas de empleados
+    - Escribe el numero de la opcion o describe tu consulta.
+
+    + (hello|hi|hey)
+    - Hello! Welcome to our virtual assistant.
+    - How can I help you today?
+    - 1. Sales - Product information
+    - 2. Support - Technical help
+    - 3. Human Resources - Employee queries
+    - Write the option number or describe your query.
+
+    // Menu opciones
+    + (1|uno|ventas|productos)
+    - Perfecto! Te conectare con nuestro equipo de ventas.
+    - Ellos te podran ayudar con informacion de productos y precios.
+    - ¿Tienes alguna pregunta especifica sobre nuestros servicios?
+
+    + (2|dos|soporte|ayuda|problema)
+    - Te ayudo con soporte tecnico.
+    - Por favor describe tu problema o consulta.
+    - Nuestro equipo tecnico te asistira lo antes posible.
+
+    + (3|tres|recursos humanos|rrhh|empleado)
+    - Hola! Soy tu asistente de Recursos Humanos.
+    - ¿En que puedo ayudarte hoy?
+    - 1. Solicitudes y permisos
+    - 2. Informacion sobre nomina
+    - 3. Beneficios y prestaciones
+    - 4. Contactar con RRHH
+    - Escribe el numero o describe tu consulta.
+
+    // Respuesta por defecto
+    + *
+    - Gracias por contactarnos.
+    - Para ayudarte mejor, puedes escribir "hola" para ver el menu.
+    - O describir directamente tu consulta.
+
+< topic

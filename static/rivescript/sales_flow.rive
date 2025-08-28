@@ -1,0 +1,55 @@
+// Flujo de ventas y precios
+// Manejo de consultas comerciales
+
+> topic random
+
++ [*] precio [*]
+- Para información de precios, tenemos estas opciones:<br>1. Consulta general de precios<br>2. Cotización personalizada<br>3. Descuentos disponibles<br><br>¿Qué te interesa?
+
++ [*] cuanto [*]
+@ precio
+
++ [*] costo [*]
+@ precio
+
++ [*] vale [*]
+@ precio
+
++ [*] comprar [*]
+- ¿Qué producto te interesa comprar?<br>1. Producto A ($100)<br>2. Producto B ($200)<br>3. Producto C ($300)<br><br>O describe lo que necesitas.
+
++ [*] descuento [*]
+- Tenemos descuentos especiales disponibles:<br>• 10% para estudiantes<br>• 15% para empresas<br>• 20% para compras mayoristas<br>• Ofertas especiales del mes<br><br>¿Cuál aplica para ti?
+
++ [*] oferta [*]
+- Nuestras ofertas actuales incluyen:<br>• Producto A con 15% de descuento<br>• Paquete especial B+C con precio preferencial<br>• Envío gratis en compras mayores a $150<br><br>¿Te interesa alguna?
+
++ [*] producto a [*]
+- El Producto A cuesta $100 e incluye:<br>• Característica premium 1<br>• Característica premium 2<br>• Garantía de 1 año<br>• Soporte técnico<br><br>¿Te gustaría más información o proceder con la compra?
+
++ [*] producto b [*]
+- El Producto B cuesta $200 e incluye:<br>• Todas las características del Producto A<br>• Funciones avanzadas exclusivas<br>• Garantía extendida de 2 años<br>• Soporte prioritario<br><br>¿Necesitas más detalles?
+
++ [*] producto c [*]
+- El Producto C es nuestro plan premium por $300:<br>• Todo lo incluido en A y B<br>• Características empresariales<br>• Soporte 24/7<br>• Configuración personalizada<br><br>Ideal para uso profesional.
+
++ si me interesa
+- ¡Excelente! Para proceder con tu consulta o compra, te voy a conectar con un especialista en ventas que te ayudará con todos los detalles.
+
++ no gracias
+- Está bien, no hay problema. Si cambias de opinión o tienes otras consultas, estaremos aquí para ayudarte. ¡Que tengas buen día!
+
+// Despedidas y comandos de cierre para ventas
++ (cerrar conversacion|cerrar conversación|cerrar|terminar|salir|finalizar)
+- Tu conversación de ventas ha sido cerrada. ¡Esperamos haberte ayudado con tu consulta! Para obtener más información sobre nuestros productos, inicia una nueva conversación.
+
++ (adios|adiós|hasta luego|nos vemos|chau|chao|ya no necesito nada)
+- ¡Hasta luego! Esperamos que encuentres lo que necesitas. Si decides realizar alguna compra o tienes más preguntas sobre nuestros productos, estaré aquí para ayudarte.
+
++ (no me interesa|no estoy interesado|no necesito nada más)
+- Entiendo perfectamente. ¡Gracias por tu tiempo! Si en el futuro necesitas alguno de nuestros productos o servicios, no dudes en contactarnos.
+
++ (gracias por la informacion|gracias por la información|muchas gracias|thank you|gracias)
+- ¡De nada! Me alegra haber podido proporcionarte la información que necesitabas. Si decides realizar alguna compra o necesitas más detalles, estaré disponible para asistirte.
+
+< topic

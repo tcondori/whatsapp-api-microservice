@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 Simulador de Chat - WhatsApp Bot</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .chat-container {
+            width: 450px;
+            height: 650px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-header {
+            background: #25D366;
+            color: white;
+            padding: 15px 20px;
+            text-align: center;
+        }
+        .flow-selector {
+            margin-bottom: 15px;
+        }
+        .flow-selector select {
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 14px;
+            width: 100%;
+        }
+        .flow-info {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f0f0f0;
+        }
+        .message {
+            margin: 10px 0;
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .user-message {
+            background: #DCF8C6;
+            margin-left: auto;
+            text-align: right;
+        }
+        .bot-message {
+            background: white;
+            margin-right: auto;
+            border: 1px solid #e0e0e0;
+        }
+        .system-message {
+            background: #fff3cd;
+            color: #856404;
+            text-align: center;
+            font-style: italic;
+            font-size: 12px;
+        }
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            text-align: center;
+            font-size: 12px;
+        }
+        .typing-indicator {
+            background: white;
+            margin-right: auto;
+            padding: 8px 16px;
+            border: 1px solid #e0e0e0;
+            display: none;
+        }
+        .typing-dots {
+            display: inline-block;
+        }
+        .typing-dots span {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #999;
+            margin: 0 2px;
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+        .chat-input {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+        }
+        .message-input {
+            flex: 1;
+            padding: 12px 16px;
+            font-size: 16px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+        }
+        .send-button {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 20px;
+            margin-left: 10px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .send-button:hover { background: #20b358; }
+        .send-button:disabled { background: #ccc; cursor: not-allowed; }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+        .control-button {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 15px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .control-button:hover { background: rgba(255, 255, 255, 0.3); }
+        .status-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        .status-connected { background: #4CAF50; color: white; }
+        .status-error { background: #f44336; color: white; }
+        .message-count {
+            text-align: center;
+            padding: 10px;
+            color: #666;
+            font-size: 12px;
+            border-bottom: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="status-indicator" id="statusIndicator">🔄 Cargando...</div>
+    
+    <div class="chat-container">
+        <div class="chat-header">
+            <h3>🤖 Simulador de Chat WhatsApp</h3>
+            
+            <div class="flow-selector">
+                <label for="flowSelect" style="font-size: 12px; display: block; margin-bottom: 5px;">Selecciona el flujo a probar:</label>
+                <select id="flowSelect" onchange="handleFlowChange()">
+                    <option value="">⏳ Cargando flujos...</option>
+                </select>
+                <div id="flowInfo" class="flow-info" style="display: none;"></div>
+            </div>
+            
+            <div class="controls">
+                <button class="control-button" onclick="clearChat()">🗑️ Limpiar</button>
+                <button class="control-button" onclick="reloadFlows()">🔄 Recargar</button>
+                <button class="control-button" onclick="resetConversation()">🔄 Reset Chat</button>
+            </div>
+        </div>
+        
+        <div class="message-count" id="messageCount">0 mensajes</div>
+        
+        <div class="chat-messages" id="chatMessages">
+            <div class="system-message message">
+                👋 ¡Bienvenido al simulador de chat!<br>
+                Selecciona un flujo y comienza a conversar.
+            </div>
+        </div>
+        
+        <div class="typing-indicator message" id="typingIndicator">
+            <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            El bot está escribiendo...
+        </div>
+        
+        <div class="chat-input">
+            <input 
+                type="text" 
+                class="message-input" 
+                id="messageInput" 
+                placeholder="Escribe un mensaje..." 
+                onkeypress="handleKeyPress(event)"
+                disabled
+            >
+            <button class="send-button" id="sendButton" onclick="sendMessage()" disabled>📤 Enviar</button>
+        </div>
+    </div>
+
+    <script>
+        // Variables globales
+        let flows = [];
+        let selectedFlow = null;
+        let conversationId = null;
+        let messageCount = 0;
+        
+        // Estado de la aplicación
+        const state = {
+            isConnected: false,
+            isLoading: false,
+            currentUser: 'simulator_user'
+        };
+        
+        // Inicializar cuando la página carga
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSimulator();
+        });
+        
+        // Inicializar simulador
+        async function initializeSimulator() {
+            updateStatus('🔄 Conectando...', 'loading');
+            
+            try {
+                await loadFlows();
+                generateConversationId();
+                updateStatus('✅ Conectado', 'connected');
+                state.isConnected = true;
+            } catch (error) {
+                updateStatus('❌ Error de conexión', 'error');
+                console.error('Error inicializando simulador:', error);
+                showSystemMessage('❌ Error conectando con el servidor. Refresca la página.');
+            }
+        }
+        
+        // Cargar lista de flujos
+        async function loadFlows() {
+            try {
+                const response = await fetch('/rivescript/flows');
+                
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                flows = data.flows || [];
+                
+                renderFlowSelector();
+                
+                if (flows.length === 0) {
+                    showSystemMessage('⚠️ No hay flujos disponibles. Ve al editor para crear algunos.');
+                }
+                
+            } catch (error) {
+                console.error('Error cargando flujos:', error);
+                showSystemMessage('❌ Error cargando flujos del servidor.');
+                throw error;
+            }
+        }
+        
+        // Renderizar selector de flujos
+        function renderFlowSelector() {
+            const select = document.getElementById('flowSelect');
+            select.innerHTML = '<option value="">-- Selecciona un flujo --</option>';
+            
+            // Agrupar flujos por estado
+            const activeFlows = flows.filter(f => f.is_active);
+            const inactiveFlows = flows.filter(f => !f.is_active);
+            
+            // Agregar flujos activos primero
+            if (activeFlows.length > 0) {
+                const activeGroup = document.createElement('optgroup');
+                activeGroup.label = '✅ Flujos Activos';
+                activeFlows.forEach(flow => {
+                    const option = document.createElement('option');
+                    option.value = flow.id;
+                    option.textContent = `${flow.name} ${flow.is_default ? '(Por defecto)' : ''}`;
+                    activeGroup.appendChild(option);
+                });
+                select.appendChild(activeGroup);
+            }
+            
+            // Agregar flujos inactivos
+            if (inactiveFlows.length > 0) {
+                const inactiveGroup = document.createElement('optgroup');
+                inactiveGroup.label = '⏸️ Flujos Inactivos';
+                inactiveFlows.forEach(flow => {
+                    const option = document.createElement('option');
+                    option.value = flow.id;
+                    option.textContent = `${flow.name} (Inactivo)`;
+                    inactiveGroup.appendChild(option);
+                });
+                select.appendChild(inactiveGroup);
+            }
+            
+            // Seleccionar flujo por defecto si existe
+            const defaultFlow = flows.find(f => f.is_default && f.is_active);
+            if (defaultFlow) {
+                select.value = defaultFlow.id;
+                handleFlowChange();
+            }
+        }
+        
+        // Manejar cambio de flujo
+        function handleFlowChange() {
+            const select = document.getElementById('flowSelect');
+            const flowId = select.value;
+            
+            if (!flowId) {
+                selectedFlow = null;
+                document.getElementById('flowInfo').style.display = 'none';
+                document.getElementById('messageInput').disabled = true;
+                document.getElementById('sendButton').disabled = true;
+                return;
+            }
+            
+            selectedFlow = flows.find(f => f.id === flowId);
+            
+            if (selectedFlow) {
+                // Mostrar información del flujo
+                const flowInfo = document.getElementById('flowInfo');
+                flowInfo.innerHTML = `
+                    <strong>${selectedFlow.name}</strong><br>
+                    ${selectedFlow.description || 'Sin descripción'}<br>
+                    <span style="font-size: 10px;">
+                        Estado: ${selectedFlow.is_active ? '✅ Activo' : '⏸️ Inactivo'} | 
+                        Prioridad: ${selectedFlow.priority} | 
+                        ${selectedFlow.is_default ? '📌 Por defecto' : ''}
+                    </span>
+                `;
+                flowInfo.style.display = 'block';
+                
+                // Habilitar input
+                document.getElementById('messageInput').disabled = false;
+                document.getElementById('sendButton').disabled = false;
+                document.getElementById('messageInput').focus();
+                
+                showSystemMessage(`✅ Flujo seleccionado: ${selectedFlow.name}`);
+                resetConversation();
+            }
+        }
+        
+        // Generar ID de conversación
+        function generateConversationId() {
+            conversationId = `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        }
+        
+        // Enviar mensaje
+        async function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message || !selectedFlow) {
+                return;
+            }
+            
+            if (state.isLoading) {
+                return; // Evitar múltiples envíos
+            }
+            
+            // Mostrar mensaje del usuario
+            addMessage(message, 'user');
+            input.value = '';
+            
+            // Mostrar indicador de escritura
+            showTypingIndicator();
+            
+            state.isLoading = true;
+            document.getElementById('sendButton').disabled = true;
+            
+            try {
+                const response = await fetch('/rivescript/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: message,
+                        user_id: state.currentUser,
+                        conversation_id: conversationId,
+                        flow_id: selectedFlow.id, // Especificar flujo a usar
+                        simulate: true // Indicar que es simulación
+                    })
+                });
+                
+                hideTypingIndicator();
+                
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addMessage(data.response || '🤖 Sin respuesta', 'bot');
+                    
+                    // Mostrar información adicional si está disponible
+                    if (data.intent) {
+                        console.log('Intent detectado:', data.intent);
+                    }
+                    if (data.confidence) {
+                        console.log('Confianza:', data.confidence);
+                    }
+                } else {
+                    addMessage(`❌ Error: ${data.error || 'Error desconocido'}`, 'error');
+                }
+                
+            } catch (error) {
+                hideTypingIndicator();
+                console.error('Error enviando mensaje:', error);
+                addMessage('❌ Error de conexión con el servidor', 'error');
+            }
+            
+            state.isLoading = false;
+            document.getElementById('sendButton').disabled = false;
+            input.focus();
+        }
+        
+        // Agregar mensaje al chat
+        function addMessage(text, type) {
+            const container = document.getElementById('chatMessages');
+            const message = document.createElement('div');
+            
+            message.className = `message ${type}-message`;
+            
+            // Convertir saltos de línea a <br> para preservar formato
+            const formattedText = text.replace(/\n/g, '<br>');
+            message.innerHTML = formattedText;
+            
+            // Añadir timestamp
+            const timestamp = new Date().toLocaleTimeString('es-ES', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            if (type === 'user' || type === 'bot') {
+                const timeSpan = document.createElement('div');
+                timeSpan.style.fontSize = '10px';
+                timeSpan.style.opacity = '0.7';
+                timeSpan.style.marginTop = '5px';
+                timeSpan.textContent = timestamp;
+                message.appendChild(timeSpan);
+            }
+            
+            container.appendChild(message);
+            container.scrollTop = container.scrollHeight;
+            
+            // Actualizar contador de mensajes
+            if (type === 'user' || type === 'bot') {
+                messageCount++;
+                updateMessageCount();
+            }
+        }
+        
+        // Mostrar mensaje del sistema
+        function showSystemMessage(text) {
+            addMessage(text, 'system');
+        }
+        
+        // Mostrar indicador de escritura
+        function showTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'block';
+            const container = document.getElementById('chatMessages');
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        // Ocultar indicador de escritura
+        function hideTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'none';
+        }
+        
+        // Limpiar chat
+        function clearChat() {
+            if (confirm('¿Limpiar todo el historial de chat?')) {
+                document.getElementById('chatMessages').innerHTML = '';
+                messageCount = 0;
+                updateMessageCount();
+                showSystemMessage('🗑️ Chat limpiado');
+            }
+        }
+        
+        // Resetear conversación
+        function resetConversation() {
+            generateConversationId();
+            showSystemMessage(`🔄 Nueva conversación iniciada con ${selectedFlow ? selectedFlow.name : 'flujo seleccionado'}`);
+        }
+        
+        // Recargar flujos
+        async function reloadFlows() {
+            updateStatus('🔄 Recargando...', 'loading');
+            try {
+                // Primero recargar en el servicio RiveScript
+                const reloadResponse = await fetch('/rivescript/reload', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (reloadResponse.ok) {
+                    const reloadData = await reloadResponse.json();
+                    console.log('Flujos recargados en RiveScript:', reloadData);
+                }
+                
+                // Luego cargar la lista actualizada
+                await loadFlows();
+                updateStatus('✅ Flujos recargados', 'connected');
+                showSystemMessage('🔄 Flujos recargados desde el servidor');
+            } catch (error) {
+                updateStatus('❌ Error recargando', 'error');
+                showSystemMessage('❌ Error recargando flujos');
+            }
+        }
+        
+        // Actualizar estado
+        function updateStatus(text, type) {
+            const indicator = document.getElementById('statusIndicator');
+            indicator.textContent = text;
+            indicator.className = `status-indicator status-${type}`;
+        }
+        
+        // Actualizar contador de mensajes
+        function updateMessageCount() {
+            document.getElementById('messageCount').textContent = `${messageCount} mensajes`;
+        }
+        
+        // Manejar Enter en el input
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+    </script>
+</body>
+</html>

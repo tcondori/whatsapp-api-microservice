@@ -1,0 +1,54 @@
+// Flujo de Facturación
+// Consultas de pagos, facturas y métodos de pago
+
+> topic random
+
+// Activación del flujo de facturación
++ [*] (facturacion|facturación|pago|pagos|factura|facturas|cuenta|billing|cobro) [*]
+- ¡Hola! 💳 Soy tu asistente de **Facturación** 📊<br><br>¿En qué puedo ayudarte hoy?<br><br>1️⃣ Estado de cuenta y pagos<br>2️⃣ Facturas y comprobantes<br>3️⃣ Métodos de pago<br>4️⃣ Planes y tarifas<br>5️⃣ Reportar problemas de facturación<br>6️⃣ Hablar con el área de cobranzas<br><br>Escribe el número o describe tu consulta.
+
+// Estado de cuenta y pagos
++ [*] (1|uno|estado|saldo|debe|debo|pendiente|vencido) [*]
+- 📋 **Estado de Cuenta**<br><br>**Información de tu cuenta:**<br><br>💰 **Saldo actual**<br>• Balance pendiente: ${<call>get_balance</call>}<br>• Último pago: {<call>last_payment_date</call>}<br>• Próximo vencimiento: {<call>next_due_date</call>}<br><br>📊 **Resumen del mes**<br>• Servicios activos: {<call>active_services</call>}<br>• Consumo del período: ${<call>current_usage</call>}<br>• Descuentos aplicados: ${<call>discounts</call>}<br><br>⚡ **Acciones rápidas:**<br>💳 Pagar ahora<br>📧 Enviar estado de cuenta por email<br>📱 Configurar pagos automáticos<br>📞 Hablar con cobranzas<br><br>¿Qué quieres hacer?
+
+// Facturas y comprobantes
++ [*] (2|dos|factura|facturas|comprobante|recibo|documento) [*]
+- 🧾 **Facturas y Comprobantes**<br><br>**Documentos disponibles:**<br><br>📄 **Facturas del mes**<br>• Factura actual (pendiente/pagada)<br>• Desgloses por servicio<br>• Impuestos y cargos adicionales<br><br>📚 **Historial**<br>• Últimos 12 meses<br>• Facturas anuales<br>• Certificados fiscales<br><br>📨 **Formatos de entrega**<br>• PDF por email<br>• Descarga directa<br>• Envío físico (costo adicional)<br><br>**¿Qué período necesitas?**<br>• Mes actual<br>• Rango específico (ej: Enero-Marzo 2025)<br>• Todo el año fiscal<br>• Una factura específica por número
+
+// Métodos de pago
++ [*] (3|tres|metodo|método|pagar|como pagar|tarjeta|transferencia|efectivo) [*]
+- 💳 **Métodos de Pago Disponibles**<br><br>**Opciones de pago:**<br><br>🏦 **Transferencia bancaria**<br>• Cuenta: 1234-5678-9012-3456<br>• Banco: Banco Nacional<br>• Referencia: Tu número de cliente<br>• Tiempo de aplicación: 24-48 horas<br><br>💳 **Tarjetas de crédito/débito**<br>• Visa, Mastercard, American Express<br>• Pago inmediato online<br>• Guardado seguro de tarjetas<br>• Sin comisiones adicionales<br><br>🏪 **Puntos de pago**<br>• OXXO, 7-Eleven, farmacias<br>• Con código de barras<br>• Aplicación en 2-4 horas<br><br>📱 **Pagos digitales**<br>• PayPal, Mercado Pago<br>• Wallets móviles<br>• Criptomonedas (Beta)<br><br>⚙️ **Pago automático**<br>• Débito automático mensual<br>• Descuentos por pronto pago<br>• Sin riesgo de mora<br><br>¿Cuál prefieres configurar?
+
+// Planes y tarifas
++ [*] (4|cuatro|plan|planes|tarifa|tarifas|precio|precios|cambiar plan) [*]
+- 📊 **Planes y Tarifas**<br><br>**Tu plan actual:**<br>🎯 Plan: {<call>current_plan</call>}<br>💰 Costo mensual: ${<call>monthly_cost</call>}<br>📅 Renovación: {<call>renewal_date</call>}<br><br>**Otros planes disponibles:**<br><br>🥉 **Plan Básico - $99/mes**<br>• 10 usuarios incluidos<br>• 50GB almacenamiento<br>• Soporte por email<br>• Funciones estándar<br><br>🥈 **Plan Profesional - $199/mes** ⭐ POPULAR<br>• 50 usuarios incluidos<br>• 200GB almacenamiento<br>• Soporte prioritario 24/7<br>• Funciones avanzadas + API<br><br>🥇 **Plan Enterprise - $399/mes**<br>• Usuarios ilimitados<br>• 1TB almacenamiento<br>• Gerente de cuenta dedicado<br>• Personalización completa<br><br>**Cambios de plan:**<br>📈 Upgrade: Inmediato, prorrateo automático<br>📉 Downgrade: Próximo ciclo de facturación<br><br>¿Te interesa algún plan específico?
+
+// Problemas de facturación
++ [*] (5|cinco|problema|error|reclamo|disputa|no reconozco|cargo incorrecto) [*]
+- 🚨 **Reporte de Problema de Facturación**<br><br>**Tipos de problemas comunes:**<br><br>❌ **Cargos incorrectos**<br>• Servicios no contratados<br>• Tarifas erróneas<br>• Doble facturación<br><br>📅 **Fechas incorrectas**<br>• Periodos mal calculados<br>• Facturación anticipada<br>• Cargos de cancelación<br><br>💳 **Problemas de pago**<br>• Pago no reflejado<br>• Error en método de pago<br>• Rechazos bancarios<br><br>📄 **Documentación**<br>• Facturas incorrectas<br>• Falta información fiscal<br>• Errores en datos<br><br>**Para reportar un problema necesito:**<br>• Número de factura o período<br>• Descripción del error<br>• Monto correcto (si lo sabes)<br>• Documentos de soporte<br><br>**¿Qué tipo de problema tienes?**
+
+// Contacto con cobranzas
++ [*] (6|seis|cobranzas|hablar|contactar|negociar|convenio) [*]
+- 📞 **Contacto con Área de Cobranzas**<br><br>**Información de contacto:**<br>📧 Email: cobranzas@empresa.com<br>📱 WhatsApp: +1-234-567-8900<br>☎️ Teléfono: +1-234-567-8901<br><br>**Horarios de atención:**<br>📅 Lunes a Viernes: 8:00 - 18:00<br>📅 Sábados: 9:00 - 14:00<br><br>**Servicios disponibles:**<br><br>💬 **Planes de pago**<br>• Convenios personalizados<br>• Pagos diferidos<br>• Descuentos por pronto pago<br><br>❓ **Aclaración de dudas**<br>• Explicación de cargos<br>• Revisión de cuenta<br>• Corrección de errores<br><br>⚡ **Urgencias**<br>• Cortes por falta de pago<br>• Reactivación inmediata<br>• Problemas críticos<br><br>**¿Tu situación es?**<br>🟢 Consulta general<br>🟡 Necesito un plan de pago<br>🔴 Urgente (servicio cortado)
+
+// Acciones específicas de pago
++ [*] (pagar ahora|pagar|payment|pay now) [*]
+- 💳 **Realizar Pago Ahora**<br><br>**Información de pago:**<br>💰 Saldo pendiente: ${<call>pending_balance</call>}<br>📅 Vencimiento: {<call>due_date</call>}<br>⚡ Estado: {<call>payment_status</call>}<br><br>**Selecciona tu método de pago:**<br><br>1️⃣ **Tarjeta de crédito/débito** (Inmediato)<br>2️⃣ **Transferencia bancaria** (24-48h)<br>3️⃣ **PayPal/Mercado Pago** (Inmediato)<br>4️⃣ **Código para tienda** (2-4h)<br><br>**¿Quieres pagar?**<br>• El saldo completo<br>• Una cantidad parcial<br>• Configurar pago automático<br><br>Escribe el número del método que prefieres.
+
++ [*] (historial|historia|pagos anteriores|mis pagos) [*]
+- 📊 **Historial de Pagos**<br><br>**Últimos pagos realizados:**<br><br>{<call>payment_history</call>}<br><br>📈 **Estadísticas:**<br>• Pagos puntuales: {<call>on_time_percentage</call>}%<br>• Método preferido: {<call>preferred_method</call>}<br>• Promedio mensual: ${<call>average_payment</call>}<br><br>**¿Necesitas?**<br>• Comprobante de un pago específico<br>• Certificado de cumplimiento<br>• Estado de cuenta detallado<br>• Proyección de pagos futuros<br><br>Dime qué información específica necesitas.
+
++ [*] (descuento|promocion|promoción|oferta|rebaja) [*]
+- 🎉 **Descuentos y Promociones**<br><br>**Descuentos activos:**<br><br>⭐ **Pago anticipado:** 5% descuento pagando antes del día 15<br>💳 **Pago automático:** 3% descuento permanente<br>👥 **Referidos:** $50 por cada nuevo cliente<br>📱 **Factura digital:** 2% adicional<br><br>**Promociones especiales:**<br>🎯 **Plan anual:** 2 meses gratis<br>🆙 **Upgrade gratuito:** Prueba plan superior 30 días<br>🎁 **Cliente VIP:** Beneficios exclusivos después de 12 meses<br><br>**Tu estado actual:**<br>✅ Descuentos aplicados: {<call>active_discounts</call>}<br>💰 Ahorro mensual: ${<call>monthly_savings</call>}<br>📈 Elegible para: {<call>eligible_promotions</call>}<br><br>¿Te interesa activar algún descuento específico?
+
+// Navegación y ayuda
++ [*] (ayuda|help|no entiendo|como funciona|cómo funciona) [*]
+- ❓ **Centro de Ayuda - Facturación**<br><br>**Preguntas frecuentes:**<br><br>❓ **¿Cuándo se cobra mi servicio?**<br>Los cargos se realizan el primer día hábil de cada mes por el período anterior.<br><br>❓ **¿Por qué cambió mi factura?**<br>Puede deberse a cambios en tu plan, servicios adicionales, o ajustes de tarifas.<br><br>❓ **¿Qué pasa si no pago a tiempo?**<br>Se aplican intereses moratorios del 2% mensual. El servicio se suspende después de 30 días.<br><br>❓ **¿Puedo cambiar mi fecha de corte?**<br>Sí, puedes solicitar cambio de fecha de facturación una vez al año.<br><br>❓ **¿Cómo actualizo mis datos fiscales?**<br>En tu portal de cliente, sección "Datos de Facturación".<br><br>¿Alguna otra pregunta específica?
+
++ [*] (gracias|thank you|perfecto|listo|resuelto) [*]
+- ¡Excelente! 😊 Me alegra haber podido ayudarte con tu consulta de facturación.<br><br>**Recordatorios importantes:**<br>💳 Próximo vencimiento: {<call>next_due_date</call>}<br>📧 Portal de cliente: portal.empresa.com<br>📱 App móvil: "Mi Cuenta Empresa"<br><br>**¿Te gustaría?**<br>📧 Recibir recordatorios por email<br>📱 Activar notificaciones push<br>🔄 Volver al menú principal<br>📞 Hablar con un especialista<br><br>¡Gracias por ser nuestro cliente! 🌟
+
++ (menu principal|inicio|volver|salir)
+- Te llevo de vuelta al menú principal...<br><br>¿En qué puedo ayudarte?<br><br>💬 **Conversación general**<br>💰 **Ventas y precios**<br>🛠️ **Soporte técnico**<br>👥 **Recursos humanos**<br>💳 **Facturación** (estuviste aquí)<br><br>Selecciona un área o escribe tu consulta.
+
+< topic

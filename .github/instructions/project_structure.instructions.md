@@ -16,78 +16,157 @@
 -->
 
 ```
-whatsapp-api-microservice/
-├── config/
-│   ├── __init__.py
-│   ├── default.py               # Configuración por defecto
-│   ├── dev.py                   # Configuración de desarrollo
-│   └── prod.py                  # Configuración de producción
-├── database/
-│   ├── __init__.py
-│   ├── connection.py            # Conexión a base de datos
-│   ├── models.py                # Modelos de base de datos
-│   └── migrations/              # Migraciones de Alembic
-│       ├── versions/
-│       └── alembic.ini
-├── app/
-│   ├── __init__.py
-│   ├── extensions.py             # Inicialización de extensiones Flask
-│   ├── private/
+proy04/
+├── app/                         # Application Factory y núcleo de la aplicación
+│   ├── __init__.py             # Factory pattern con Flask-RESTX y registro de blueprints
+│   ├── config.py               # Configuraciones por ambiente (dev/staging/prod)
+│   ├── extensions.py           # Inicialización de extensiones (DB, Migrate, Celery)
+│   │
+│   ├── api/                    # Blueprint principal para REST API con Flask-RESTX
+│   │   ├── __init__.py         # Blueprint de API con namespaces organizados
+│   │   ├── messages/           # Blueprint de mensajería (namespace)
+│   │   │   ├── __init__.py     # Namespace de mensajería WhatsApp
+│   │   │   ├── routes.py       # Endpoints de mensajería
+│   │   │   └── models.py       # Modelos Flask-RESTX para Swagger
+│   │   ├── media/              # Blueprint de multimedia (namespace)
+│   │   │   ├── __init__.py     # Namespace de archivos multimedia
+│   │   │   ├── routes.py       # Endpoints de multimedia
+│   │   │   └── models.py       # Modelos Flask-RESTX para Swagger
+│   │   ├── contacts/           # Blueprint de contactos (namespace)
+│   │   │   ├── __init__.py     # Namespace de gestión de contactos
+│   │   │   ├── routes.py       # Endpoints de contactos
+│   │   │   └── models.py       # Modelos Flask-RESTX para Swagger
+│   │   ├── webhooks/           # Blueprint de webhooks (namespace)
+│   │   │   ├── __init__.py     # Namespace de endpoints de webhooks
+│   │   │   ├── routes.py       # Endpoints de webhooks
+│   │   │   └── models.py       # Modelos Flask-RESTX para Swagger
+│   │   └── health/             # Blueprint de health checks
+│   │       ├── __init__.py     # Blueprint de monitoreo
+│   │       └── routes.py       # Health checks y monitoreo
+│   │
+│   ├── webhooks/               # Sistema completo de procesamiento de webhooks
 │   │   ├── __init__.py
-│   │   ├── auth.py               # Autenticación y autorización
-│   │   ├── validators.py         # Validadores internos
-│   │   └── utils.py              # Utilidades privadas
-│   ├── api/
+│   │   ├── msg_handler.py      # Manejador de mensajes entrantes
+│   │   ├── status_handler.py   # Manejador de estados de mensaje
+│   │   ├── webhook_proc.py     # Procesador principal de webhooks
+│   │   └── signature_validator.py  # Verificación de firmas WhatsApp
+│   │
+│   ├── services/               # Capa de lógica de negocio
 │   │   ├── __init__.py
-│   │   ├── messages/
+│   │   ├── msg_service.py      # Servicio de mensajería
+│   │   ├── media_service.py    # Servicio de archivos multimedia
+│   │   ├── contact_service.py  # Servicio de contactos
+│   │   └── whatsapp_client.py  # Cliente para WhatsApp Business API
+│   │
+│   ├── models/                 # Modelos SQLAlchemy y Pydantic
+│   │   ├── __init__.py
+│   │   ├── database/           # Modelos de base de datos (SQLAlchemy)
 │   │   │   ├── __init__.py
-│   │   │   ├── routes.py         # Rutas de mensajes
-│   │   │   ├── models.py         # Modelos de request/response
-│   │   │   └── services.py       # Lógica de negocio de mensajes
-│   │   ├── contacts/
-│   │   │   ├── __init__.py
-│   │   │   ├── routes.py         # Rutas de contactos
-│   │   │   ├── models.py         # Modelos de contactos
-│   │   │   └── services.py       # Lógica de negocio de contactos
-│   │   ├── media/
-│   │   │   ├── __init__.py
-│   │   │   ├── routes.py         # Rutas de medios
-│   │   │   ├── models.py         # Modelos de medios
-│   │   │   └── services.py       # Lógica de negocio de medios
-│   │   └── webhooks/
+│   │   │   ├── message.py      # Modelo de mensajes
+│   │   │   ├── contact.py      # Modelo de contactos
+│   │   │   ├── media.py        # Modelo de archivos multimedia
+│   │   │   └── webhook_log.py  # Log de eventos webhook
+│   │   └── schemas/            # Esquemas de validación (Pydantic)
 │   │       ├── __init__.py
-│   │       ├── routes.py         # Rutas de webhooks
-│   │       ├── models.py         # Modelos de webhooks
-│   │       └── services.py       # Procesamiento de webhooks
-│   ├── repositories/
+│   │       ├── webhook_schemas.py   # Esquemas para payloads de webhooks
+│   │       ├── message_schemas.py   # Esquemas para tipos de mensajes
+│   │       └── api_schemas.py       # Esquemas para respuestas de API
+│   │
+│   ├── repositories/           # Patrón Repository para acceso a datos
 │   │   ├── __init__.py
-│   │   ├── msg_repo.py           # Repositorio de mensajes
-│   │   ├── contact_repo.py       # Repositorio de contactos
-│   │   └── media_repo.py         # Repositorio de medios
-│   └── utils/
+│   │   ├── base_repository.py  # Repositorio base con operaciones comunes
+│   │   ├── message_repository.py   # Repositorio de mensajes
+│   │   ├── contact_repository.py   # Repositorio de contactos
+│   │   └── media_repository.py     # Repositorio de multimedia
+│   │
+│   ├── utils/                  # Utilidades y helpers
+│   │   ├── __init__.py
+│   │   ├── whatsapp_auth.py    # Autenticación WhatsApp API
+│   │   ├── media_handler.py    # Manejo de archivos multimedia
+│   │   ├── validators.py       # Validadores personalizados
+│   │   ├── rate_limiter.py     # Rate limiting implementation
+│   │   └── logger.py           # Configuración de logging centralizado
+│   │
+│   ├── tasks/                  # Tareas asíncronas con Celery
+│   │   ├── __init__.py
+│   │   ├── message_tasks.py    # Tareas de procesamiento de mensajes
+│   │   └── webhook_tasks.py    # Tareas de procesamiento de webhooks
+│   │
+│   └── middleware/             # Middleware personalizado
 │       ├── __init__.py
-│       ├── formatters.py         # Formateadores de mensajes
-│       ├── exceptions.py         # Excepciones personalizadas
-│       └── helpers.py            # Funciones auxiliares
-├── tests/
+│       ├── auth_middleware.py  # Middleware de autenticación
+│       ├── rate_limit_middleware.py  # Middleware de rate limiting
+│       └── logging_middleware.py     # Middleware de logging
+│
+├── logs/                       # Directorio completo de logs organizados por tipo
+│   └── 2025/                   # Logs archivados por fecha
+│       ├── 08/                 # Logs archivados por mes
+│       │   ├── 06/             # Logs archivados por día
+│       │   ├── 07/
+│       │   └── .../
+│       └── .../
+│
+├── migrations/                 # Migraciones de base de datos con Alembic
+│   ├── alembic.ini
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions/
+│
+├── tests/                      # Suite completa de tests
 │   ├── __init__.py
-│   ├── unit/
+│   ├── conftest.py            # Fixtures y configuración de pytest
+│   ├── api/                   # Tests de blueprints de API
+│   │   ├── __init__.py
+│   │   ├── test_messages.py   # Tests del blueprint de mensajes
+│   │   ├── test_media.py      # Tests del blueprint de media
+│   │   ├── test_contacts.py   # Tests del blueprint de contactos
+│   │   └── test_webhooks.py   # Tests del blueprint de webhooks
+│   ├── webhooks/              # Tests de webhooks
+│   │   ├── __init__.py
+│   │   ├── test_msg_handler.py
+│   │   └── test_webhook_proc.py
+│   ├── services/              # Tests de servicios
+│   │   ├── __init__.py
 │   │   ├── test_msg_service.py
-│   │   ├── test_contact_service.py
-│   │   └── test_webhook_service.py
-│   ├── integration/
-│   │   ├── test_msg_routes.py
-│   │   ├── test_webhook_routes.py
-│   │   └── test_database.py
-│   └── fixtures/
-│       ├── webhook_samples.json
-│       └── message_samples.json
-├── requirements.txt              # Dependencias del proyecto
-├── .env                         # Variables de entorno (no versionar)
-├── .env.example                 # Ejemplo de variables de entorno
-├── README.md                    # Documentación principal
-├── entrypoint.py               # Punto de entrada de la aplicación
-└── .gitignore
+│   │   └── test_media_service.py
+│   ├── repositories/          # Tests de repositories
+│   │   ├── __init__.py
+│   │   └── test_repositories.py
+│   └── utils/                 # Tests de utilidades
+│       ├── __init__.py
+│       └── test_validators.py
+│
+├── docker/                    # Archivos de containerización
+│   ├── Dockerfile
+│   ├── docker-compose.yml
+│   ├── docker-compose.dev.yml
+│   └── nginx/
+│       └── default.conf
+│
+├── docs/                      # Documentación del proyecto
+│   ├── api/                   # Documentación de API
+│   ├── deployment/            # Guías de deployment
+│   └── architecture/          # Documentación de arquitectura
+│
+├── scripts/                   # Scripts de utilidad
+│   ├── init_db.py            # Inicialización de base de datos
+│   ├── seed_data.py          # Datos de prueba
+│   ├── deploy.sh             # Script de deployment
+│   └── log_rotation.sh       # Script de rotación de logs
+│
+├── uploads/                   # Archivos subidos (local development)
+├── .env.example              # Variables de entorno ejemplo
+├── .env.dev                  # Variables de desarrollo
+├── .env.staging              # Variables de staging
+├── .env.prod                 # Variables de producción
+├── requirements.txt          # Dependencias de producción
+├── requirements-dev.txt      # Dependencias de desarrollo
+├── pytest.ini               # Configuración de pytest
+├── alembic.ini              # Configuración de Alembic
+├── celery_config.py         # Configuración de Celery
+├── logging.conf             # Configuración de logging centralizada
+├── wsgi.py                  # Entry point para WSGI
+└── README.md                # Documentación principal
 ```
 
 ## Application Factory Pattern

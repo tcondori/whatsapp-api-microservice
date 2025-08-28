@@ -1,0 +1,32 @@
+// Flujo básico de atención al cliente WhatsApp
+// Configuración por defecto del chatbot
+
+! version = 2.0
+
+> topic random
+
+    + hola
+    - ¡Hola! Bienvenido a nuestro servicio. ¿En qué puedo ayudarte?
+
+    + hello
+    - Hello! Welcome to our service. How can I help you?
+
+    + [*] buenos dias [*]
+    - ¡Buenos días! Gracias por contactarnos. ¿En qué podemos asistirte?
+
+    + [*] buenas tardes [*]
+    - ¡Buenas tardes! ¿Cómo podemos ayudarte hoy?
+
+    + [*] ayuda [*]
+    - Por supuesto, estoy aquí para ayudarte. ¿Qué necesitas saber?
+
+    + [*] info [*]
+    - Te puedo brindar información sobre nuestros servicios. ¿Qué te interesa conocer?
+
+    + [*] gracias [*]
+    - ¡De nada! Si necesitas algo más, no dudes en preguntar.
+
+    + *
+    - Lo siento, no entendí tu consulta. ¿Podrías ser más específico?
+
+< topic

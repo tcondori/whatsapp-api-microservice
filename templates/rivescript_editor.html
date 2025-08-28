@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor RiveScript - WhatsApp Chatbot</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/theme/monokai.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/rivescript-editor.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Panel lateral - Lista de flujos -->
+            <div class="col-md-3 bg-light p-3">
+                <h4>📝 Flujos RiveScript</h4>
+                <div class="mb-3">
+                    <button class="btn btn-primary btn-sm" onclick="createNewFlow()">
+                        ➕ Nuevo Flujo
+                    </button>
+                    <button class="btn btn-success btn-sm" onclick="reloadFlows()">
+                        🔄 Recargar
+                    </button>
+                </div>
+                
+                <!-- Lista de flujos -->
+                <div id="flowsList" class="flows-list">
+                    <!-- Se carga dinámicamente -->
+                </div>
+            </div>
+            
+            <!-- Panel principal - Editor -->
+            <div class="col-md-9 p-0">
+                <!-- Toolbar -->
+                <div class="bg-dark text-white p-2 d-flex justify-content-between align-items-center">
+                    <div>
+                        <span id="currentFlowTitle">📝 Selecciona un flujo para editar</span>
+                        <span id="flowStatus" class="badge bg-secondary ms-2"></span>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-light btn-sm me-2" onclick="saveFlow()" id="saveBtn" disabled>
+                            💾 Guardar
+                        </button>
+                        <button class="btn btn-outline-info btn-sm me-2" onclick="testFlow()" id="testBtn" disabled>
+                            🧪 Probar
+                        </button>
+                        <button class="btn btn-outline-warning btn-sm me-2" onclick="toggleFlowStatus()" id="toggleBtn" disabled>
+                            ⏯️ Activar/Desactivar
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="deleteFlow()" id="deleteBtn" disabled>
+                            🗑️ Eliminar
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Editor de código -->
+                <div class="editor-container">
+                    <textarea id="codeEditor" placeholder="Selecciona un flujo para comenzar a editar..."></textarea>
+                </div>
+                
+                <!-- Panel de pruebas -->
+                <div id="testPanel" class="test-panel" style="display: none;">
+                    <div class="bg-info text-white p-2">
+                        <strong>🧪 Panel de Pruebas</strong>
+                        <button class="btn btn-sm btn-outline-light float-end" onclick="closeTestPanel()">✖</button>
+                    </div>
+                    <div class="p-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label>Mensaje de prueba:</label>
+                                <input type="text" class="form-control" id="testMessage" placeholder="Escribe un mensaje..." onkeypress="handleTestKeyPress(event)">
+                                <button class="btn btn-info btn-sm mt-2" onclick="runTest()">Enviar Prueba</button>
+                            </div>
+                            <div class="col-md-6">
+                                <label>Respuesta:</label>
+                                <div id="testResponse" class="test-response p-2 border rounded bg-light">
+                                    <!-- Respuesta aparece aquí -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal para nuevo flujo -->
+    <div class="modal fade" id="newFlowModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Crear Nuevo Flujo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="newFlowForm">
+                        <div class="mb-3">
+                            <label class="form-label">Nombre del flujo:</label>
+                            <input type="text" class="form-control" id="flowName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Descripción:</label>
+                            <textarea class="form-control" id="flowDescription" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Prioridad:</label>
+                            <input type="number" class="form-control" id="flowPriority" value="1" min="1">
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="flowIsDefault">
+                            <label class="form-check-label">Es flujo por defecto</label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="submitNewFlow()">Crear Flujo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.2/mode/javascript/javascript.min.js"></script>
+    <script>
+        // Variables globales
+        let editor;
+        let currentFlow = null;
+        let flows = [];
+        
+        // Inicializar editor CodeMirror
+        document.addEventListener('DOMContentLoaded', function() {
+            editor = CodeMirror.fromTextArea(document.getElementById('codeEditor'), {
+                lineNumbers: true,
+                mode: 'text',
+                theme: 'monokai',
+                autofocus: true,
+                lineWrapping: true,
+                tabSize: 2
+            });
+            
+            loadFlows();
+        });
+        
+        // Cargar lista de flujos
+        async function loadFlows() {
+            try {
+                const response = await fetch('/rivescript/flows');
+                if (response.ok) {
+                    flows = await response.json();
+                    renderFlowsList();
+                } else {
+                    showAlert('Error cargando flujos: ' + response.status, 'danger');
+                }
+            } catch (error) {
+                showAlert('Error de conexión: ' + error.message, 'danger');
+            }
+        }
+        
+        // Renderizar lista de flujos
+        function renderFlowsList() {
+            const container = document.getElementById('flowsList');
+            container.innerHTML = '';
+            
+            flows.forEach(flow => {
+                const flowCard = document.createElement('div');
+                flowCard.className = `flow-item p-2 mb-2 border rounded ${flow.is_active ? 'border-success' : 'border-secondary'}`;
+                flowCard.style.cursor = 'pointer';
+                
+                flowCard.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>${flow.name}</strong>
+                            <div class="small text-muted">${flow.description || 'Sin descripción'}</div>
+                            <div class="small">
+                                <span class="badge ${flow.is_active ? 'bg-success' : 'bg-secondary'}">
+                                    ${flow.is_active ? '✅ Activo' : '⏸️ Inactivo'}
+                                </span>
+                                ${flow.is_default ? '<span class="badge bg-primary ms-1">📌 Por Defecto</span>' : ''}
+                            </div>
+                        </div>
+                        <small class="text-muted">P: ${flow.priority}</small>
+                    </div>
+                `;
+                
+                flowCard.onclick = () => selectFlow(flow);
+                container.appendChild(flowCard);
+            });
+        }
+        
+        // Seleccionar flujo para editar
+        async function selectFlow(flow) {
+            try {
+                // Cargar contenido completo del flujo
+                const response = await fetch(`/rivescript/flows/${flow.id}`);
+                if (response.ok) {
+                    currentFlow = await response.json();
+                    
+                    // Actualizar UI
+                    document.getElementById('currentFlowTitle').textContent = `📝 ${currentFlow.name}`;
+                    document.getElementById('flowStatus').textContent = currentFlow.is_active ? '✅ Activo' : '⏸️ Inactivo';
+                    document.getElementById('flowStatus').className = `badge ms-2 ${currentFlow.is_active ? 'bg-success' : 'bg-secondary'}`;
+                    
+                    // Cargar contenido en editor
+                    editor.setValue(currentFlow.rivescript_content || '');
+                    
+                    // Habilitar botones
+                    document.getElementById('saveBtn').disabled = false;
+                    document.getElementById('testBtn').disabled = false;
+                    document.getElementById('toggleBtn').disabled = false;
+                    document.getElementById('deleteBtn').disabled = false;
+                    
+                    // Actualizar estilo en lista
+                    document.querySelectorAll('.flow-item').forEach(item => {
+                        item.classList.remove('bg-primary', 'text-white');
+                    });
+                    
+                    const selectedItem = Array.from(document.querySelectorAll('.flow-item')).find(
+                        item => item.textContent.includes(flow.name)
+                    );
+                    if (selectedItem) {
+                        selectedItem.classList.add('bg-primary', 'text-white');
+                    }
+                    
+                } else {
+                    showAlert('Error cargando flujo: ' + response.status, 'danger');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'danger');
+            }
+        }
+        
+        // Guardar flujo
+        async function saveFlow() {
+            if (!currentFlow) return;
+            
+            try {
+                const response = await fetch(`/rivescript/flows/${currentFlow.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        rivescript_content: editor.getValue()
+                    })
+                });
+                
+                if (response.ok) {
+                    showAlert('Flujo guardado exitosamente', 'success');
+                    currentFlow.rivescript_content = editor.getValue();
+                } else {
+                    showAlert('Error guardando flujo: ' + response.status, 'danger');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'danger');
+            }
+        }
+        
+        // Probar flujo
+        function testFlow() {
+            if (!currentFlow) return;
+            document.getElementById('testPanel').style.display = 'block';
+            document.getElementById('testMessage').focus();
+        }
+        
+        // Cerrar panel de pruebas
+        function closeTestPanel() {
+            document.getElementById('testPanel').style.display = 'none';
+        }
+        
+        // Ejecutar prueba
+        async function runTest() {
+            const message = document.getElementById('testMessage').value.trim();
+            if (!message) return;
+            
+            try {
+                const response = await fetch('/rivescript/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        rivescript_content: editor.getValue(),
+                        test_message: message
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    document.getElementById('testResponse').innerHTML = `
+                        <strong>Respuesta:</strong> ${result.response || 'Sin respuesta'}<br>
+                        <small class="text-muted">Tiempo: ${result.processing_time || 'N/A'}</small>
+                    `;
+                } else {
+                    document.getElementById('testResponse').innerHTML = `
+                        <span class="text-danger">Error en la prueba: ${response.status}</span>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('testResponse').innerHTML = `
+                    <span class="text-danger">Error: ${error.message}</span>
+                `;
+            }
+        }
+        
+        // Manejar Enter en campo de prueba
+        function handleTestKeyPress(event) {
+            if (event.key === 'Enter') {
+                runTest();
+            }
+        }
+        
+        // Alternar estado activo/inactivo
+        async function toggleFlowStatus() {
+            if (!currentFlow) return;
+            
+            try {
+                const endpoint = currentFlow.is_active ? 
+                    `/flows/${currentFlow.id}/activate` : 
+                    `/flows/${currentFlow.id}/activate`;
+                
+                const method = currentFlow.is_active ? 'DELETE' : 'POST';
+                
+                const response = await fetch(endpoint, { method });
+                
+                if (response.ok) {
+                    currentFlow.is_active = !currentFlow.is_active;
+                    document.getElementById('flowStatus').textContent = currentFlow.is_active ? '✅ Activo' : '⏸️ Inactivo';
+                    document.getElementById('flowStatus').className = `badge ms-2 ${currentFlow.is_active ? 'bg-success' : 'bg-secondary'}`;
+                    
+                    showAlert(`Flujo ${currentFlow.is_active ? 'activado' : 'desactivado'} exitosamente`, 'success');
+                    loadFlows(); // Recargar lista
+                } else {
+                    showAlert('Error cambiando estado del flujo: ' + response.status, 'danger');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'danger');
+            }
+        }
+        
+        // Eliminar flujo
+        async function deleteFlow() {
+            if (!currentFlow) return;
+            
+            if (!confirm(`¿Estás seguro de eliminar el flujo "${currentFlow.name}"?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/flows/${currentFlow.id}`, { method: 'DELETE' });
+                
+                if (response.ok) {
+                    showAlert('Flujo eliminado exitosamente', 'success');
+                    currentFlow = null;
+                    editor.setValue('');
+                    document.getElementById('currentFlowTitle').textContent = '📝 Selecciona un flujo para editar';
+                    document.getElementById('flowStatus').textContent = '';
+                    
+                    // Deshabilitar botones
+                    document.getElementById('saveBtn').disabled = true;
+                    document.getElementById('testBtn').disabled = true;
+                    document.getElementById('toggleBtn').disabled = true;
+                    document.getElementById('deleteBtn').disabled = true;
+                    
+                    loadFlows(); // Recargar lista
+                } else {
+                    showAlert('Error eliminando flujo: ' + response.status, 'danger');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'danger');
+            }
+        }
+        
+        // Crear nuevo flujo
+        function createNewFlow() {
+            const modal = new bootstrap.Modal(document.getElementById('newFlowModal'));
+            modal.show();
+        }
+        
+        // Enviar formulario de nuevo flujo
+        async function submitNewFlow() {
+            const name = document.getElementById('flowName').value.trim();
+            const description = document.getElementById('flowDescription').value.trim();
+            const priority = parseInt(document.getElementById('flowPriority').value) || 1;
+            const isDefault = document.getElementById('flowIsDefault').checked;
+            
+            if (!name) {
+                showAlert('El nombre del flujo es requerido', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/rivescript/flows', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name,
+                        description,
+                        priority,
+                        is_default: isDefault,
+                        rivescript_content: '// Nuevo flujo RiveScript\n+ hola\n- ¡Hola! Soy un nuevo flujo.'
+                    })
+                });
+                
+                if (response.ok) {
+                    const newFlow = await response.json();
+                    showAlert('Flujo creado exitosamente', 'success');
+                    
+                    // Cerrar modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('newFlowModal'));
+                    modal.hide();
+                    
+                    // Limpiar formulario
+                    document.getElementById('newFlowForm').reset();
+                    
+                    // Recargar y seleccionar nuevo flujo
+                    await loadFlows();
+                    selectFlow(newFlow);
+                    
+                } else {
+                    showAlert('Error creando flujo: ' + response.status, 'danger');
+                }
+            } catch (error) {
+                showAlert('Error: ' + error.message, 'danger');
+            }
+        }
+        
+        // Recargar flujos
+        async function reloadFlows() {
+            try {
+                // Recargar en el servicio
+                const reloadResponse = await fetch('/flows/reload', { method: 'POST' });
+                
+                if (reloadResponse.ok) {
+                    showAlert('Flujos recargados en el chatbot', 'info');
+                }
+                
+                // Recargar lista local
+                await loadFlows();
+                
+            } catch (error) {
+                showAlert('Error recargando flujos: ' + error.message, 'warning');
+            }
+        }
+        
+        // Mostrar alertas
+        function showAlert(message, type = 'info') {
+            // Crear elemento de alerta
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+            alert.style.cssText = 'top: 10px; right: 10px; z-index: 9999; min-width: 300px;';
+            
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.body.appendChild(alert);
+            
+            // Auto-remover después de 4 segundos
+            setTimeout(() => {
+                if (alert.parentNode) {
+                    alert.parentNode.removeChild(alert);
+                }
+            }, 4000);
+        }
+    </script>
+</body>
+</html>

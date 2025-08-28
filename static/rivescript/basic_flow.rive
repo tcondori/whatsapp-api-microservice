@@ -1,0 +1,71 @@
+// Flujo básico de atención al cliente
+// Menú principal de navegación y saludos
+
+> topic random
+
+// Saludo principal con menú de navegación
++ hola
+- ¡Hola! 👋 Bienvenido a nuestro **Centro de Atención Virtual** 🤖<br><br>Soy tu asistente inteligente y estoy aquí para ayudarte. ¿En qué área puedo asistirte hoy?<br><br>1️⃣ **Ventas y precios** - Información sobre productos y cotizaciones<br>2️⃣ **Soporte técnico** - Resolución de problemas y troubleshooting<br>3️⃣ **Recursos humanos** - Consultas de empleados y beneficios<br>4️⃣ **Facturación** - Estado de cuenta, pagos y facturas<br>5️⃣ **Conversación general** - Chat abierto y consultas diversas<br><br>**Puedes escribir:**<br>• El nombre del área que te interesa<br>• Un número (1-5)<br>• Directamente tu pregunta específica<br><br>¿Cómo prefieres continuar?
+
++ hello
+- Hello! 👋 Welcome to our **Virtual Service Center** 🤖<br><br>I'm your intelligent assistant and I'm here to help you. Which area can I assist you with today?<br><br>1️⃣ **Sales and pricing**<br>2️⃣ **Technical support**<br>3️⃣ **Human resources**<br>4️⃣ **Billing**<br>5️⃣ **General conversation**<br><br>You can write the area name, number (1-5), or ask your question directly.
+
++ buenos dias
+- ¡Buenos días! ☀️ Es un excelente día para ayudarte.<br><br>¿En qué área necesitas asistencia?<br><br>1️⃣ Ventas • 2️⃣ Soporte • 3️⃣ RRHH • 4️⃣ Facturación • 5️⃣ General<br><br>Escribe el número o área de tu interés.
+
++ buenas tardes  
+- ¡Buenas tardes! 🌅 ¿Cómo puedo ayudarte hoy?<br><br>Selecciona tu área de interés:<br>1️⃣ Ventas • 2️⃣ Soporte • 3️⃣ RRHH • 4️⃣ Facturación • 5️⃣ General
+
++ buenas noches
+- ¡Buenas noches! 🌙 Estamos aquí 24/7 para ayudarte.<br><br>¿En qué puedo asistirte?<br>1️⃣ Ventas • 2️⃣ Soporte • 3️⃣ RRHH • 4️⃣ Facturación • 5️⃣ General
+
+// Solicitud de ayuda y menú principal
++ [*] (ayuda|help|menu|menú|opciones|options) [*]
+- 🆘 **Centro de Ayuda** 🆘<br><br>¿En qué área específica necesitas ayuda?<br><br>1️⃣ **Ventas y precios** 💰<br>• Información de productos<br>• Cotizaciones personalizadas<br>• Planes y tarifas<br><br>2️⃣ **Soporte técnico** 🛠️<br>• Problemas técnicos<br>• Configuración de cuenta<br>• Troubleshooting<br><br>3️⃣ **Recursos humanos** 👥<br>• Beneficios de empleados<br>• Solicitudes y permisos<br>• Información laboral<br><br>4️⃣ **Facturación** 💳<br>• Estado de cuenta<br>• Métodos de pago<br>• Reportar problemas<br><br>5️⃣ **Conversación general** 💬<br>• Preguntas diversas<br>• Información de la empresa<br><br>**Escribe el número o nombre del área.**
+
+// Navegación directa por números
++ (1|uno|ventas)
+- Perfecto, te dirijo al área de **Ventas y Precios** 💰<br><br>{@ventas}
+
++ (2|dos|soporte)
+- Te conecto con **Soporte Técnico** 🛠️<br><br>{@soporte tecnico}
+
++ (3|tres|rrhh)
+- Te llevo a **Recursos Humanos** 👥<br><br>{@recursos humanos}
+
++ (4|cuatro|facturacion|facturación)
+- Accediendo a **Facturación** 💳<br><br>{@facturacion}
+
++ (5|cinco|general)
+- Entrando en **Conversación General** 💬<br><br>¡Perfecto! Estamos en modo conversación abierta. Puedes hacerme cualquier pregunta o contarme en qué necesitas ayuda. Soy bastante versátil y puedo ayudarte con temas diversos.<br><br>¿Qué te gustaría saber o de qué quieres que hablemos?
+
++ 2
+- Para soporte técnico, por favor describe tu problema y un técnico especializado te contactará pronto.
+
++ 3
+- Perfecto, te estoy conectando con un agente humano. Por favor espera un momento mientras te transfiero.
+
+// Despedidas y comandos de cierre
++ (cerrar conversacion|cerrar conversación|cerrar|terminar|salir|finalizar)
+- Tu conversación ha sido cerrada. ¡Gracias por contactarnos! Para iniciar una nueva conversación, envía cualquier mensaje.
+
++ (adios|adiós|hasta luego|nos vemos|chau|chao)
+- ¡Hasta luego! Que tengas un excelente día. Si necesitas ayuda nuevamente, no dudes en contactarnos.
+
++ (bye|goodbye)
+- Goodbye! Thank you for contacting us. Feel free to reach out if you need more help.
+
++ (gracias|muchas gracias|thank you|thanks)
+- ¡De nada! Me alegra haber podido ayudarte. Si tienes más consultas, estaré aquí para asistirte.
+
++ gracias
+- ¡De nada! Fue un placer ayudarte. ¿Hay algo más en lo que pueda asistirte?
+
++ chau
+- ¡Chau! Que tengas un excelente día.
+
+// Fallback para mensajes no reconocidos
++ *
+- No entendí tu mensaje. Escribe "ayuda" para ver las opciones disponibles o "menu" para ver el menú principal.
+
+< topic

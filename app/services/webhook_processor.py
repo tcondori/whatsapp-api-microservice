@@ -1,6 +1,7 @@
 """
 Procesador de webhooks de WhatsApp
 Maneja todos los eventos de webhook entrantes de WhatsApp Business API
+Integra respuestas automáticas del chatbot
 """
 import json
 import logging
@@ -12,9 +13,16 @@ from app.repositories.base_repo import MessageRepository, MessagingLineRepositor
 from app.utils.exceptions import ValidationError, WhatsAppAPIError
 from app.utils.helpers import create_success_response
 
+# Importar servicio de chatbot
+try:
+    from app.services.chatbot_service import ChatbotService
+    CHATBOT_AVAILABLE = True
+except ImportError:
+    CHATBOT_AVAILABLE = False
+
 
 class WebhookProcessor:
-    """Procesador principal de webhooks de WhatsApp"""
+    """Procesador principal de webhooks de WhatsApp con respuestas automáticas del chatbot"""
     
     def __init__(self):
         """Inicializa el procesador de webhooks"""
@@ -22,6 +30,18 @@ class WebhookProcessor:
         self.whatsapp_api = WhatsAppAPIService()
         self.msg_repo = MessageRepository()
         self.line_repo = MessagingLineRepository()
+        
+        # Inicializar chatbot si está disponible
+        self.chatbot = None
+        if CHATBOT_AVAILABLE:
+            try:
+                self.chatbot = ChatbotService()
+                self.logger.info("Chatbot inicializado exitosamente")
+            except Exception as e:
+                self.logger.warning(f"No se pudo inicializar chatbot: {e}")
+                self.chatbot = None
+        else:
+            self.logger.info("Chatbot no disponible - funcionando sin respuestas automáticas")
         
         # Cache de mensajes procesados para evitar duplicados
         self._processed_messages = set()
@@ -227,7 +247,10 @@ class WebhookProcessor:
                 except Exception as e:
                     self.logger.warning(f"No se pudo marcar mensaje como leído: {e}")
                 
-                # Procesar lógica de negocio (respuestas automáticas, etc.)
+                # Procesar respuesta automática del chatbot
+                self._process_chatbot_response(message_record, from_number, content, line)
+                
+                # Procesar lógica de negocio adicional (respuestas automáticas, etc.)
                 self._handle_business_logic(message_record, message)
             else:
                 self.logger.info(f"Mensaje {message_id} ya procesado anteriormente, saltando lógica de negocio")
@@ -455,6 +478,115 @@ class WebhookProcessor:
         except Exception as e:
             self.logger.error(f"Error en lógica de negocio: {e}")
             # No re-lanzar la excepción para no fallar el procesamiento del webhook
+    
+    def _process_chatbot_response(self, message_record, from_number: str, content: str, line) -> None:
+        """
+        Procesa respuesta automática del chatbot
+        Args:
+            message_record: Registro del mensaje en BD
+            from_number: Número de teléfono del remitente  
+            content: Contenido del mensaje
+            line: Línea de mensajería
+        """
+        try:
+            # Solo procesar si el chatbot está disponible
+            if not self.chatbot:
+                self.logger.debug("Chatbot no disponible, saltando respuesta automática")
+                return
+            
+            # Solo procesar mensajes de texto
+            if message_record.message_type != 'text':
+                self.logger.debug(f"Tipo de mensaje '{message_record.message_type}' no procesado por chatbot")
+                return
+            
+            # Verificar que el contenido sea una cadena
+            if not isinstance(content, str) or not content.strip():
+                self.logger.debug("Contenido del mensaje no válido para chatbot")
+                return
+            
+            self.logger.info(f"Procesando mensaje con chatbot: {from_number} -> '{content[:50]}...'")
+            
+            # Procesar mensaje con el chatbot
+            chatbot_response = self.chatbot.process_message(from_number, content, message_record)
+            
+            # Verificar si hay respuesta del chatbot
+            if not chatbot_response or not chatbot_response.get('response'):
+                self.logger.debug("Sin respuesta del chatbot")
+                return
+            
+            response_text = chatbot_response.get('response', '').strip()
+            if not response_text:
+                self.logger.debug("Respuesta del chatbot vacía")
+                return
+            
+            self.logger.info(f"Chatbot generó respuesta: {chatbot_response.get('type', 'unknown')} - {response_text[:50]}...")
+            
+            # Enviar respuesta automática
+            self._send_chatbot_reply(
+                phone_number=from_number,
+                line=line, 
+                response_text=response_text,
+                chatbot_response=chatbot_response
+            )
+            
+        except Exception as e:
+            self.logger.error(f"Error procesando respuesta del chatbot: {e}")
+            # No fallar el procesamiento del webhook por errores del chatbot
+    
+    def _send_chatbot_reply(self, phone_number: str, line, response_text: str, chatbot_response: Dict[str, Any]) -> None:
+        """
+        Envía respuesta del chatbot vía WhatsApp
+        Args:
+            phone_number: Número de destino
+            line: Línea de mensajería
+            response_text: Texto de la respuesta
+            chatbot_response: Respuesta completa del chatbot con metadata
+        """
+        try:
+            if not line or not line.phone_number_id:
+                self.logger.warning(f"No se puede enviar respuesta del chatbot: línea no válida")
+                return
+            
+            # Enviar mensaje vía WhatsApp API
+            api_response = self.whatsapp_api.send_text_message(
+                phone_number=phone_number,
+                text=response_text,
+                phone_number_id=line.phone_number_id
+            )
+            
+            # Guardar respuesta del chatbot en BD
+            if api_response and 'messages' in api_response:
+                whatsapp_message_id = api_response['messages'][0]['id']
+                
+                # Preparar metadata del chatbot para almacenar en contenido
+                chatbot_metadata = {
+                    'original_text': response_text,
+                    'chatbot_type': chatbot_response.get('type', 'unknown'),
+                    'processing_time_ms': chatbot_response.get('processing_time_ms', 0),
+                    'confidence_score': chatbot_response.get('confidence_score', 0),
+                    'flow_id': chatbot_response.get('flow_id'),
+                    'generated_by': 'chatbot'
+                }
+                
+                # Crear registro del mensaje enviado
+                self.msg_repo.create(
+                    whatsapp_message_id=whatsapp_message_id,
+                    line_id=line.line_id,
+                    phone_number=phone_number,
+                    message_type='text',
+                    content=chatbot_metadata,  # Guardar metadata completa
+                    status='sent',
+                    direction='outbound'
+                )
+                
+                self.logger.info(f"Respuesta del chatbot enviada exitosamente a {phone_number}")
+                self.logger.debug(f"Metadata de respuesta: {chatbot_metadata}")
+                
+            else:
+                self.logger.warning("No se pudo obtener ID del mensaje enviado por el chatbot")
+                
+        except Exception as e:
+            self.logger.error(f"Error enviando respuesta del chatbot a {phone_number}: {e}")
     
     def _send_auto_reply(self, phone_number: str, line_id: str, text: str) -> None:
         """

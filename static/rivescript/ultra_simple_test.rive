@@ -1,0 +1,14 @@
+! version = 2.0
+
+> topic random
+
+    + hello
+    - Hello there!
+
+    + hola
+    - ¡Hola! ¿Cómo estás?
+
+    + *
+    - I don't understand that.
+
+< topic

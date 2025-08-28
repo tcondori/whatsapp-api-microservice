@@ -120,7 +120,64 @@ def _init_redis(app):
 
 def _init_logging(app):
     """
-    Configura el sistema de logging de la aplicación
+    Configura el sistema de logging avanzado de la aplicación
+    Args:
+        app: Instancia de la aplicación Flask
+    """
+    try:
+        # Usar el sistema de logging estructurado
+        from app.utils.log_config import initialize_logging
+        from app.utils.middleware import init_application_logging
+        
+        # Obtener entorno desde config o variables de entorno
+        environment = app.config.get('FLASK_ENV', os.getenv('FLASK_ENV', 'development'))
+        log_level = app.config.get('LOG_LEVEL', 'INFO')
+        
+        # Inicializar sistema de logging estructurado
+        logging_info = initialize_logging(app.config, environment)
+        
+        # Configurar middleware de logging para la aplicación
+        handlers = init_application_logging(app, log_level, environment)
+        
+        # Hacer disponibles los handlers en el contexto de la app
+        app.logging_handlers = handlers
+        app.logging_environment = environment
+        
+        # Configurar logging para bibliotecas externas con el nuevo sistema
+        from app.utils.logger import WhatsAppLogger
+        
+        # Silenciar logs verbosos de bibliotecas externas
+        external_loggers = [
+            'werkzeug', 'sqlalchemy.engine', 'requests', 
+            'urllib3', 'flask_cors', 'flask_limiter'
+        ]
+        
+        for logger_name in external_loggers:
+            ext_logger = logging.getLogger(logger_name)
+            ext_logger.setLevel(logging.WARNING)
+        
+        # Log de inicio exitoso
+        system_logger = WhatsAppLogger.get_logger('system')
+        system_logger.info(
+            f"Sistema de logging avanzado inicializado correctamente",
+            extra={'extra_data': {
+                'environment': environment,
+                'log_level': log_level,
+                'structured_logging': True,
+                'event_system': True,
+                'aggregation_enabled': logging_info.get('aggregation_enabled', False)
+            }}
+        )
+        
+    except ImportError as e:
+        # Fallback al sistema de logging básico si hay problemas
+        logging.warning(f"No se pudo cargar sistema de logging avanzado: {e}")
+        _init_basic_logging(app)
+
+
+def _init_basic_logging(app):
+    """
+    Configura el sistema de logging básico como fallback
     Args:
         app: Instancia de la aplicación Flask
     """
@@ -168,7 +225,7 @@ def _init_logging(app):
     # Configurar logging para componentes del microservicio
     logging.getLogger('whatsapp_api').setLevel(log_level)
     
-    logging.info(f"Sistema de logging configurado - Nivel: {log_level}")
+    logging.info(f"Sistema de logging básico configurado - Nivel: {log_level}")
 
 def get_redis_client():
     """

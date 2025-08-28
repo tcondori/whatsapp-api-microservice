@@ -1,0 +1,52 @@
+// Flujo de ventas y consultas comerciales
+// Información de precios y servicios
+
+! version = 2.0
+
+> topic random
+
+    + [*] precio [*]
+    - Para información de precios, tenemos estas opciones:
+    - 1. Consulta general de precios
+    - 2. Cotización personalizada
+    - 3. Planes disponibles
+    - ¿Qué opción te interesa?
+
+    + [*] venta [*]
+    - ¿Estás interesado en nuestros productos? Te puedo ayudar con:
+    - • Catálogo de productos
+    - • Precios y promociones
+    - • Proceso de compra
+    - ¿Qué necesitas?
+
+    + [*] servicio [*]
+    - Ofrecemos diferentes servicios:
+    - ✓ Consultoría técnica
+    - ✓ Soporte especializado
+    - ✓ Implementación
+    - ¿Cuál te interesa?
+
+    + [*] cotizacion [*]
+    - Para generar una cotización personalizada necesito algunos datos:
+    - 1. ¿Qué producto o servicio necesitas?
+    - 2. ¿Cantidad aproximada?
+    - 3. ¿Tienes fecha límite?
+
+    + 1
+    - Perfecto, para consulta general de precios:
+    - Nuestros precios base son competitivos del mercado.
+    - ¿Hay algún producto específico que te interesa?
+
+    + 2
+    - Excelente, para cotización personalizada:
+    - Un asesor comercial se contactará contigo en las próximas 2 horas.
+    - ¿Podrías proporcionarme tu nombre completo?
+
+    + 3
+    - Genial, estos son nuestros planes disponibles:
+    - 🔹 Plan Básico: $99/mes
+    - 🔹 Plan Profesional: $199/mes  
+    - 🔹 Plan Enterprise: $399/mes
+    - ¿Cuál se ajusta mejor a tus necesidades?
+
+< topic

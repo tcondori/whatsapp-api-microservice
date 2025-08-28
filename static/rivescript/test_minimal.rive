@@ -1,0 +1,42 @@
+! version = 2.0
+
+// Flujo básico de prueba
+> topic random
+
++ hola
+- ¡Hola! 👋 Bienvenido a nuestro asistente virtual.
+- ¿En qué puedo ayudarte?
+- 1. Ventas - Información de productos
+- 2. Soporte - Ayuda técnica  
+- 3. Recursos Humanos - Consultas de empleados
+- Escribe el número de la opción o describe tu consulta.
+
++ (hello|hi|hey)
+- Hello! Welcome to our virtual assistant.
+- How can I help you today?
+- 1. Sales - Product information
+- 2. Support - Technical help
+- 3. Human Resources - Employee queries
+
++ (1|uno|ventas|productos)
+- Perfecto! Te conectaré con nuestro equipo de ventas.
+- ¿Tienes alguna pregunta específica sobre nuestros servicios?
+
++ (2|dos|soporte|ayuda|problema)
+- Te ayudo with soporte técnico.
+- Por favor describe tu problema o consulta.
+
++ (3|tres|recursos humanos|rrhh|empleado)
+- ¡Hola! Soy tu asistente de Recursos Humanos.
+- ¿En qué puedo ayudarte hoy?
+- 1. Solicitudes y permisos
+- 2. Información sobre nómina
+- 3. Beneficios y prestaciones
+- Escribe el número o describe tu consulta.
+
++ *
+- Gracias por contactarnos.
+- Para ayudarte mejor, puedes escribir "hola" para ver el menú.
+- ¿En qué te puedo ayudar?
+
+< topic

@@ -1,0 +1,58 @@
+// Flujo de Soporte Técnico
+// Manejo de consultas técnicas y troubleshooting
+
+> topic random
+
+// Activación del flujo técnico
++ [*] (soporte tecnico|soporte técnico|ayuda tecnica|ayuda técnica|problema tecnico|problema técnico|no funciona|error|falla) [*]
+- Hola, soy el asistente de **Soporte Técnico** 🛠️<br><br>¿Con qué puedo ayudarte hoy?<br><br>1️⃣ Problemas de conexión<br>2️⃣ Errores de la aplicación<br>3️⃣ Problemas de rendimiento<br>4️⃣ Configuración de cuenta<br>5️⃣ Hablar con un técnico<br><br>Escribe el número o describe tu problema.
+
++ [*] (soporte|support|help|ayuda) [*]
+@ soporte tecnico
+
++ [*] (1|uno|conexion|conexión|internet|red|wifi) [*]
+- 🌐 **Problemas de Conexión**<br><br>Vamos a solucionar tu problema paso a paso:<br><br>**Paso 1:** Verifica tu conexión a internet<br>• ¿Puedes abrir otras páginas web?<br>• ¿Otros dispositivos se conectan bien?<br><br>**Paso 2:** Reinicia tu router<br>• Desconecta 30 segundos<br>• Vuelve a conectar<br><br>¿Ya probaste estos pasos? Responde **sí** o **no**.
+
++ [*] (2|dos|aplicacion|aplicación|app|programa|software) [*]
+- 🐛 **Errores de Aplicación**<br><br>Te ayudo a identificar el problema:<br><br>• **¿Qué error específico ves?** Describe el mensaje<br>• **¿Cuándo ocurre?** Al abrir, usar una función específica<br>• **¿En qué dispositivo?** Móvil, tablet, computadora<br><br>También puedes probar:<br>✅ Cerrar y abrir la app<br>✅ Reiniciar el dispositivo<br>✅ Verificar actualizaciones<br><br>Cuéntame más detalles del error.
+
++ [*] (3|tres|lento|lentitud|rendimiento|performance|demora) [*]
+- ⚡ **Problemas de Rendimiento**<br><br>Vamos a acelerar tu experiencia:<br><br>**Diagnóstico rápido:**<br>• ¿La lentitud es general o en funciones específicas?<br>• ¿Cuánto tiempo lleva cargando?<br>• ¿Tienes muchas aplicaciones abiertas?<br><br>**Soluciones inmediatas:**<br>🔄 Reiniciar la aplicación<br>🧹 Limpiar caché del navegador<br>💾 Liberar espacio de almacenamiento<br>📶 Verificar velocidad de internet<br><br>¿Quieres que te guíe con alguna de estas soluciones?
+
++ [*] (4|cuatro|cuenta|configuracion|configuración|perfil|usuario|password|contraseña) [*]
+- ⚙️ **Configuración de Cuenta**<br><br>¿Qué necesitas configurar?<br><br>🔐 **Seguridad**<br>• Cambiar contraseña<br>• Configurar 2FA<br>• Revisar sesiones activas<br><br>👤 **Perfil**<br>• Actualizar datos personales<br>• Cambiar foto de perfil<br>• Preferencias de notificaciones<br><br>💳 **Facturación**<br>• Métodos de pago<br>• Historial de pagos<br>• Cambiar plan<br><br>Selecciona una categoría o describe qué quieres hacer.
+
++ [*] (5|cinco|tecnico|técnico|humano|persona|agente|especialista) [*]
+- 🙋‍♂️ **Conexión con Técnico Especializado**<br><br>Te voy a conectar con nuestro equipo técnico especializado.<br><br>**Antes de transferirte, necesito:**<br>• Descripción breve del problema<br>• Tu número de cliente (si lo tienes)<br>• Urgencia: Alta/Media/Baja<br><br>**Horarios de atención:**<br>📅 Lunes a Viernes: 8:00 - 18:00<br>📅 Sábados: 9:00 - 14:00<br><br>Por favor proporciona la información solicitada.
+
+// Respuestas a soluciones
++ [*] (si|sí|yes|probé|probe|hice|funciona|solucionado) [*]
+- ¡Excelente! 🎉 Me alegra que haya funcionado.<br><br>**¿Necesitas ayuda con algo más?**<br>• Otro problema técnico<br>• Consejos de prevención<br>• Volver al menú principal<br><br>O simplemente escribe **gracias** si ya terminamos.
+
++ [*] (no|nope|no funciona|sigue igual|persiste|aun no|aún no) [*]
+- Entiendo, vamos a intentar otras soluciones más específicas.<br><br>**Escalación del problema:**<br>🔧 Te voy a dar pasos más detallados<br>📞 O puedo conectarte con un técnico especializado<br><br>**Para darte mejor ayuda, necesito saber:**<br>• ¿Qué dispositivo/sistema usas exactamente?<br>• ¿El problema comenzó recientemente o siempre fue así?<br>• ¿Hay algún mensaje de error específico?<br><br>Comparte estos detalles conmigo.
+
+// Troubleshooting específico
++ [*] (windows|android|ios|iphone|mac|linux) [*]
+- Perfecto, tienes <get system><set system=<star1>></get>. Esto me ayuda a darte soluciones más precisas.<br><br>**Pasos específicos para <get system>:**<br><br>1️⃣ **Verificación del sistema**<br>2️⃣ **Limpieza de archivos temporales**<br>3️⃣ **Actualización de drivers/sistema**<br>4️⃣ **Verificación de compatibilidad**<br><br>¿Con cuál quieres empezar? O si prefieres, puedo darte todos los pasos detallados.
+
+// Casos comunes FAQ
++ [*] (olvide|olvidé|contraseña|password|no puedo entrar|acceso) [*]
+- 🔐 **Recuperación de Contraseña**<br><br>No te preocupes, es muy común. Aquí tienes las opciones:<br><br>**Método 1: Email**<br>• Ve a la página de login<br>• Haz clic en "¿Olvidaste tu contraseña?"<br>• Ingresa tu email registrado<br>• Revisa tu bandeja de entrada y spam<br><br>**Método 2: SMS**<br>• Si tienes teléfono registrado<br>• Selecciona "Recibir código por SMS"<br><br>**¿No recibes el email?** Puede tomar hasta 10 minutos. También verifica la carpeta de spam.<br><br>¿Qué método prefieres intentar?
+
++ [*] (lento|demora|loading|cargando|espera) [*]
+- ⏱️ **Problema de Velocidad Detectado**<br><br>Vamos a acelerar las cosas:<br><br>**Diagnóstico rápido:**<br>🔍 ¿Qué tan lento? (más de 30 seg, 1-2 min, más de 5 min)<br>🔍 ¿En qué momento específico? (login, carga de página, subir archivo)<br><br>**Soluciones por orden de efectividad:**<br>1️⃣ Limpiar caché del navegador<br>2️⃣ Cerrar otras pestañas/apps<br>3️⃣ Verificar velocidad de internet<br>4️⃣ Cambiar de navegador temporalmente<br><br>¿Empezamos con el paso 1?
+
+// Transferencia a humano
++ [*] (quiero hablar|quiero un humano|transferir|escalar|urgente) [*]
+- 🚀 **Transferencia Inmediata**<br><br>Entiendo que necesitas atención personalizada.<br><br>**Tu caso ha sido escalado con prioridad.**<br><br>📋 **Información que se enviará:**<br>• Problema reportado: <get problem><set problem=<star1>></get><br>• Soluciones intentadas: <get attempted><set attempted=Transferencia directa></get><br>• Hora de solicitud: <get time><set time={@date}></get><br><br>⏰ **Tiempo estimado de contacto:** 5-15 minutos<br><br>Un técnico te contactará a este número pronto. **¡No cierres la conversación!**
+
+// Satisfacción y cierre
++ [*] (gracias|thank you|solucionado|resuelto|perfecto|excelente) [*]
+- ¡De nada! 😊 Me alegra haber podido ayudarte.<br><br>**Resumen de tu sesión de soporte:**<br>✅ Problema atendido<br>✅ Solución proporcionada<br>✅ Seguimiento completado<br><br>**¿Te gustaría?**<br>📧 Recibir un email con el resumen<br>⭐ Calificar la atención recibida<br>🔄 Volver al menú principal<br><br>¡Que tengas un excelente día!
+
+// Navegación
++ (menu principal|inicio|volver)
+- Te llevo de vuelta al menú principal...<br><br>¿En qué puedo ayudarte?<br><br>💬 **Conversación general**<br>💰 **Ventas y precios**<br>🛠️ **Soporte técnico** (estás aquí)<br>👥 **Recursos humanos**<br>💳 **Facturación**<br><br>Selecciona un área o escribe tu consulta.
+
+< topic

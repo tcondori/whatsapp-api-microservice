@@ -1,0 +1,1422 @@
+{% extends "base.html" %}
+
+{% block title %}Simulador WhatsApp - Chat Interactivo{% endblock %}
+
+{% block content %}
+<div class="h-full flex" x-data="chatApp()" x-init="initializeChat()">
+    <!-- Panel lateral del Editor RiveScript -->
+    <div class="bg-gray-50 border-r border-gray-200 transition-all duration-300 overflow-hidden"
+         :class="showRiveScriptEditor ? 'w-1/2' : 'w-0'">
+        
+        <div x-show="showRiveScriptEditor" class="h-full flex flex-col">
+            <!-- Header del editor -->
+            <div class="bg-gray-800 text-white p-4 flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-semibold">Editor RiveScript</h2>
+                        <p class="text-sm text-gray-300">Edita y prueba flujos de conversación</p>
+                    </div>
+                </div>
+                <button @click="showRiveScriptEditor = false" class="text-gray-300 hover:text-white">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            
+            <!-- Panel de información de flujos activos -->
+            <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-0">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-lg font-medium text-green-800">📊 Estado de Flujos</h4>
+                    <button @click="loadActiveFlows()" 
+                            class="px-3 py-1 bg-green-600 text-white rounded-md text-sm hover:bg-green-700 transition-colors">
+                        🔄 Actualizar
+                    </button>
+                </div>
+                <div id="active-flows-list" class="space-y-2">
+                    <div class="text-gray-600">Cargando flujos activos...</div>
+                </div>
+            </div>
+            
+            <!-- Selector de flujos -->
+            <div class="p-4 bg-white border-b">
+                <div class="flex items-center space-x-2 mb-3">
+                    <label class="text-sm font-medium text-gray-700">Flujo:</label>
+                    <select x-model="selectedFlowId" @change="loadSelectedFlow()" 
+                            class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-purple-500 focus:border-purple-500">
+                        <option value="">Crear nuevo flujo</option>
+                        <template x-for="flow in availableFlows" :key="flow.id">
+                            <option :value="flow.id" x-text="flow.name + ' (' + flow.category + ')'"></option>
+                        </template>
+                    </select>
+                    <button @click="reloadFlows()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-md">
+                        🔄
+                    </button>
+                </div>
+                
+                <!-- Información del flujo actual -->
+                <div x-show="currentFlow" class="text-sm text-gray-600">
+                    <div class="flex justify-between">
+                        <span x-text="'Flujo: ' + (currentFlow?.name || 'Nuevo')"></span>
+                        <span x-text="'Estado: ' + (currentFlow?.is_active ? 'Activo' : 'Inactivo')"></span>
+                    </div>
+                </div>
+                
+                <!-- Controles del editor -->
+                <div class="flex space-x-2 mt-3">
+                    <button @click="saveRiveScript()" 
+                            :disabled="!riveScriptContent.trim()"
+                            class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                        💾 Guardar
+                    </button>
+                    <button @click="testRiveScript()" 
+                            :disabled="!riveScriptContent.trim()"
+                            class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                        🧪 Probar
+                    </button>
+                    <button @click="reloadChatbotFlows()" 
+                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
+                        🔄 Recargar Bot
+                    </button>
+                    <button @click="newFlow()" 
+                            class="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm">
+                        ➕ Nuevo
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Editor de código -->
+            <div class="flex-1 flex flex-col bg-white">
+                <div class="p-2 bg-gray-100 border-b">
+                    <div class="flex items-center justify-between text-sm">
+                        <div class="flex items-center space-x-4">
+                            <span class="text-gray-600">Líneas: <span x-text="riveScriptContent.split('\\n').length"></span></span>
+                            <span class="text-gray-600">Caracteres: <span x-text="riveScriptContent.length"></span></span>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button @click="formatRiveScript()" class="text-blue-600 hover:text-blue-800">Formatear</button>
+                            <button @click="validateRiveScript()" class="text-green-600 hover:text-green-800">Validar</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <textarea x-model="riveScriptContent" 
+                          @input="debouncedValidation()"
+                          placeholder="// Ejemplo de flujo RiveScript:
+// 
+// + hola
+// - ¡Hola! ¿En qué puedo ayudarte?
+// 
+// + [*] soporte [*]
+// - Te dirijo al área de soporte técnico. ¿Cuál es tu consulta?
+//
+// + [*] (problema|error|falla) [*]
+// - Entiendo que tienes un problema. ¿Podrías describirlo con más detalle?
+"
+                          class="flex-1 p-4 font-mono text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 border-0"
+                          style="min-height: 300px;"></textarea>
+            </div>
+            
+            <!-- Panel de pruebas del editor -->
+            <div class="bg-gray-50 border-t p-4">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">🧪 Pruebas Rápidas</h4>
+                <div class="flex space-x-2 mb-2">
+                    <input x-model="testMessage" 
+                           @keyup.enter="testFlowMessage()"
+                           placeholder="Mensaje de prueba..." 
+                           class="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-purple-500 focus:border-purple-500">
+                    <button @click="testFlowMessage()" 
+                            :disabled="!testMessage.trim()"
+                            class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 text-sm">
+                        Probar
+                    </button>
+                </div>
+                
+                <!-- Resultado de la prueba -->
+                <div x-show="testResult" class="mt-2 p-3 bg-white border rounded-md">
+                    <div class="text-sm">
+                        <div class="text-gray-600 mb-1">Entrada: <span class="font-mono bg-gray-100 px-2 py-1 rounded" x-text="testResult?.input"></span></div>
+                        <div class="text-gray-600 mb-1">Salida: <span class="font-mono bg-blue-100 px-2 py-1 rounded" x-text="testResult?.output"></span></div>
+                        <div class="text-gray-600">Tipo: <span class="font-mono bg-green-100 px-2 py-1 rounded" x-text="testResult?.type"></span></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Log de validación -->
+            <div x-show="validationErrors.length > 0" class="bg-red-50 border-t border-red-200 p-4 max-h-32 overflow-y-auto">
+                <h4 class="text-sm font-medium text-red-800 mb-2">⚠️ Errores de Validación</h4>
+                <template x-for="error in validationErrors" :key="error">
+                    <div class="text-sm text-red-700 mb-1" x-text="error"></div>
+                </template>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Panel principal del chat -->
+    <div class="flex-1 flex flex-col">
+        <!-- Header del chat con botón del editor -->
+        <header class="bg-whatsapp-700 text-white p-4 shadow-lg">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <!-- Botón del editor RiveScript -->
+                    <button @click="showRiveScriptEditor = !showRiveScriptEditor" 
+                            class="p-2 hover:bg-whatsapp-600 rounded-full transition-colors"
+                            :class="showRiveScriptEditor ? 'bg-whatsapp-600' : ''">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                        </svg>
+                    </button>
+                    
+                    <!-- Avatar del bot -->
+                    <div class="w-10 h-10 bg-whatsapp-500 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                        </svg>
+                    </div>
+                    
+                    <div>
+                        <h1 class="text-lg font-semibold">Chatbot WhatsApp</h1>
+                        <p class="text-sm text-whatsapp-100" x-text="sessionInfo.phone_number || 'Simulador de Chat'"></p>
+                    </div>
+                </div>
+                
+                <!-- Controles del header -->
+                <div class="flex items-center space-x-2">
+                    <!-- Indicador de estado -->
+                    <div class="flex items-center space-x-2 text-sm">
+                        <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse" x-show="isConnected"></div>
+                        <span x-text="isConnected ? 'En línea' : 'Desconectado'" class="text-whatsapp-100"></span>
+                    </div>
+                    
+                    <!-- Botón de nueva sesión -->
+                    <button @click="newSession()" 
+                            class="bg-whatsapp-500 hover:bg-whatsapp-600 px-3 py-1 rounded-full text-sm font-medium transition-colors">
+                        Nueva Sesión
+                    </button>
+                    
+                    <!-- Menú de opciones -->
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open" class="p-2 hover:bg-whatsapp-600 rounded-full">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
+                            </svg>
+                        </button>
+                        
+                        <div x-show="open" @click.away="open = false" x-transition
+                             class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 z-10">
+                            <button @click="clearChat(); open = false" 
+                                    class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                🗑️ Limpiar Chat
+                            </button>
+                            <button @click="closeSession(); open = false" 
+                                    class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                ❌ Cerrar Sesión
+                            </button>
+                            <button @click="showCommands = !showCommands; open = false" 
+                                    class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                🎯 Comandos de Prueba
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+    
+    <!-- Panel de comandos de prueba (deslizable) -->
+    <div x-show="showCommands" x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 transform -translate-y-full"
+         x-transition:enter-end="opacity-100 transform translate-y-0"
+         class="bg-blue-50 border-b border-blue-200 p-4">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-blue-800">🎯 Comandos de Prueba</h3>
+            <button @click="showCommands = false" class="text-blue-600 hover:text-blue-800">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+            <template x-for="category in testCommands" :key="category.category">
+                <div class="bg-white rounded-lg p-3 border border-blue-100">
+                    <h4 class="font-medium text-blue-800 mb-2" x-text="category.category"></h4>
+                    <div class="space-y-1">
+                        <template x-for="command in category.commands" :key="command">
+                            <button @click="sendQuickMessage(command)" 
+                                    class="block w-full text-left px-2 py-1 text-blue-600 hover:bg-blue-50 rounded text-xs"
+                                    x-text="command"></button>
+                        </template>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+    
+    <!-- Área de mensajes -->
+    <div class="flex-1 chat-container p-4 overflow-hidden">
+        <div id="chat-messages" class="h-full overflow-y-auto space-y-3 scroll-smooth">
+            <!-- Mensajes del chat -->
+            <template x-for="message in messages" :key="message.id">
+                <div class="fade-in" :class="message.sender === 'user' ? 'flex justify-end' : 'flex justify-start'">
+                    <div class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg shadow-sm"
+                         :class="{
+                             'message-bubble-user': message.sender === 'user',
+                             'message-bubble-bot': message.sender === 'bot' && message.message_type !== 'system',
+                             'message-bubble-system': message.message_type === 'system'
+                         }">
+                        <!-- Contenido del mensaje -->
+                        <div class="text-sm" x-html="formatMessage(message.message)"></div>
+                        
+                        <!-- Metadatos del mensaje -->
+                        <div class="flex items-center justify-between mt-1 text-xs opacity-70">
+                            <span x-text="ChatUtils.formatTime(message.timestamp)"></span>
+                            <div x-show="message.metadata && message.metadata.processing_time_ms" 
+                                 class="text-xs" 
+                                 x-text="message.metadata.processing_time_ms + 'ms'"></div>
+                        </div>
+                        
+                        <!-- Indicador de tipo para bot -->
+                        <div x-show="message.sender === 'bot' && message.metadata && message.metadata.type" 
+                             class="text-xs mt-1 opacity-60"
+                             x-text="'Tipo: ' + message.metadata.type"></div>
+                    </div>
+                </div>
+            </template>
+            
+            <!-- Indicador de escritura -->
+            <div x-show="isTyping" class="flex justify-start fade-in">
+                <div class="message-bubble-bot max-w-xs px-4 py-2 rounded-lg shadow-sm">
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Área de entrada de mensaje -->
+    <div class="bg-white border-t border-gray-200 p-4">
+        <div class="flex items-center space-x-3">
+            <!-- Botón de adjuntar (placeholder) -->
+            <button class="p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                </svg>
+            </button>
+            
+            <!-- Input de mensaje -->
+            <div class="flex-1 relative">
+                <input type="text" 
+                       x-model="newMessage" 
+                       @keyup.enter="sendMessage()"
+                       :disabled="isTyping || !isConnected"
+                       placeholder="Escribe un mensaje..." 
+                       class="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-whatsapp-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed">
+                
+                <!-- Contador de caracteres -->
+                <div class="absolute -top-6 right-2 text-xs text-gray-500" 
+                     x-show="newMessage.length > 0"
+                     x-text="newMessage.length + '/500'"></div>
+            </div>
+            
+            <!-- Botón enviar -->
+            <button @click="sendMessage()" 
+                    :disabled="!newMessage.trim() || isTyping || !isConnected"
+                    class="p-2 bg-whatsapp-500 text-white rounded-full hover:bg-whatsapp-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                </svg>
+            </button>
+        </div>
+        
+        <!-- Status bar -->
+        <div class="mt-2 text-xs text-gray-500 flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <span x-text="messages.length + ' mensajes'"></span>
+                <span x-show="sessionInfo.session_id" x-text="'Sesión: ' + sessionInfo.session_id.substring(0, 8) + '...'"></span>
+            </div>
+            <div x-show="lastResponseTime" x-text="'Última respuesta: ' + lastResponseTime + 'ms'"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Agregar este div después del header del panel de RiveScript -->
+<div class="active-flows-info">
+    <h4>📊 Estado de Flujos</h4>
+    <div id="active-flows-list">
+        <div class="loading">Cargando flujos activos...</div>
+    </div>
+    <button id="refresh-flows" class="btn btn-sm btn-secondary">🔄 Actualizar</button>
+</div>
+
+<!-- Agregar estilos CSS -->
+<style>
+.active-flows-info {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #e8f5e8;
+    border-radius: 8px;
+    border-left: 4px solid #28a745;
+}
+
+.flow-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin: 5px 0;
+    background: white;
+    border-radius: 4px;
+    border-left: 3px solid #007bff;
+}
+
+.flow-status.active {
+    border-left-color: #28a745;
+    background: #f8fff8;
+}
+
+.flow-status.inactive {
+    border-left-color: #6c757d;
+    background: #f8f9fa;
+    opacity: 0.7;
+}
+
+.flow-priority {
+    background: #007bff;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+}
+
+.flow-default {
+    background: #ffc107;
+    color: #212529;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function chatApp() {
+    return {
+        // Estado del chat
+        messages: [],
+        newMessage: '',
+        isTyping: false,
+        isConnected: false,
+        showCommands: false,
+        lastResponseTime: null,
+        
+        // Información de la sesión
+        sessionInfo: {
+            session_id: null,
+            phone_number: null,
+            user_id: null
+        },
+        
+        // Comandos de prueba
+        testCommands: [
+            {
+                category: 'Saludos',
+                commands: ['hola', 'buenos días', 'buenas tardes', 'hi']
+            },
+            {
+                category: 'Navegación', 
+                commands: ['menu', 'ayuda', '1', '2', '3', '4', '5']
+            },
+            {
+                category: 'Áreas Especializadas',
+                commands: ['ventas', 'soporte técnico', 'recursos humanos', 'facturación']
+            },
+            {
+                category: 'Control',
+                commands: ['cerrar conversación', 'volver al menu', 'hablar con agente']
+            },
+            {
+                category: 'Pruebas Específicas',
+                commands: ['problema de conexión', 'quiero comprar', 'solicitar vacaciones', 'consultar factura']
+            }
+        ],
+        
+        // Inicialización
+        async initializeChat() {
+            this.isConnected = true;
+            await this.loadSession();
+            await this.loadTestCommands();
+            await this.reloadFlows(); // Inicializar editor RiveScript
+            this.scrollToBottom();
+        },
+        
+        // Cargar sesión existente o crear nueva
+        async loadSession() {
+            try {
+                const response = await fetchAPI('/chat/session-info');
+                
+                if (response.status === 'success') {
+                    this.sessionInfo = {
+                        session_id: response.session.session_id,
+                        phone_number: response.session.phone_number,
+                        user_id: response.session.phone_number
+                    };
+                    this.messages = response.session.messages;
+                } else {
+                    await this.newSession();
+                }
+            } catch (error) {
+                console.error('Error cargando sesión:', error);
+                await this.newSession();
+            }
+        },
+        
+        // Crear nueva sesión
+        async newSession() {
+            try {
+                const response = await fetchAPI('/chat/new-session');
+                
+                if (response.status === 'success') {
+                    this.sessionInfo = {
+                        session_id: response.session_id,
+                        phone_number: response.phone_number,
+                        user_id: response.phone_number
+                    };
+                    this.messages = [];
+                    
+                    // Cargar mensajes iniciales
+                    await this.loadMessages();
+                    
+                    ChatUtils.showToast('Nueva sesión iniciada', 'success');
+                } else {
+                    throw new Error(response.message || 'Error creando sesión');
+                }
+            } catch (error) {
+                console.error('Error creando nueva sesión:', error);
+                ChatUtils.showToast('Error al crear nueva sesión', 'error');
+            }
+        },
+        
+        // Cargar mensajes
+        async loadMessages() {
+            try {
+                const response = await fetchAPI('/chat/get-messages');
+                
+                if (response.status === 'success') {
+                    this.messages = response.messages;
+                    this.$nextTick(() => this.scrollToBottom());
+                }
+            } catch (error) {
+                console.error('Error cargando mensajes:', error);
+            }
+        },
+        
+        // Cargar comandos de prueba
+        async loadTestCommands() {
+            try {
+                const response = await fetchAPI('/chat/test-commands');
+                if (response.status === 'success') {
+                    this.testCommands = response.test_commands;
+                }
+            } catch (error) {
+                console.error('Error cargando comandos de prueba:', error);
+            }
+        },
+        
+        // Enviar mensaje
+        async sendMessage() {
+            if (!this.newMessage.trim() || this.isTyping) return;
+            
+            const messageText = this.newMessage.trim();
+            this.newMessage = '';
+            this.isTyping = true;
+            
+            try {
+                const startTime = Date.now();
+                
+                const response = await fetchAPI('/chat/send-message', {
+                    method: 'POST',
+                    body: JSON.stringify({ message: messageText })
+                });
+                
+                const endTime = Date.now();
+                this.lastResponseTime = endTime - startTime;
+                
+                if (response.status === 'success') {
+                    // Agregar mensaje de usuario
+                    this.messages.push(response.user_message);
+                    
+                    // Agregar mensaje del bot
+                    this.messages.push(response.bot_message);
+                    
+                    // Actualizar info de sesión
+                    if (response.session_info) {
+                        this.sessionInfo = { ...this.sessionInfo, ...response.session_info };
+                    }
+                    
+                    this.$nextTick(() => this.scrollToBottom());
+                } else {
+                    throw new Error(response.message || 'Error enviando mensaje');
+                }
+            } catch (error) {
+                console.error('Error enviando mensaje:', error);
+                ChatUtils.showToast('Error enviando mensaje', 'error');
+            } finally {
+                this.isTyping = false;
+            }
+        },
+        
+        // Enviar mensaje rápido (desde comandos de prueba)
+        async sendQuickMessage(message) {
+            this.newMessage = message;
+            await this.sendMessage();
+            this.showCommands = false;
+        },
+        
+        // Limpiar chat
+        async clearChat() {
+            try {
+                const response = await fetchAPI('/chat/clear-chat', { method: 'POST' });
+                
+                if (response.status === 'success') {
+                    this.messages = [response.system_message];
+                    ChatUtils.showToast('Chat limpiado', 'success');
+                    this.$nextTick(() => this.scrollToBottom());
+                } else {
+                    throw new Error(response.message);
+                }
+            } catch (error) {
+                console.error('Error limpiando chat:', error);
+                ChatUtils.showToast('Error limpiando chat', 'error');
+            }
+        },
+        
+        // Cerrar sesión
+        async closeSession() {
+            try {
+                const response = await fetchAPI('/chat/close-session', { method: 'POST' });
+                
+                if (response.status === 'success') {
+                    ChatUtils.showToast('Sesión cerrada', 'success');
+                    setTimeout(() => this.newSession(), 1000);
+                } else {
+                    throw new Error(response.message);
+                }
+            } catch (error) {
+                console.error('Error cerrando sesión:', error);
+                ChatUtils.showToast('Error cerrando sesión', 'error');
+            }
+        },
+        
+        // Formatear mensaje para mostrar
+        formatMessage(message) {
+            // Convertir URLs en links
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            message = message.replace(urlRegex, '<a href="$1" target="_blank" class="text-blue-600 underline">$1</a>');
+            
+            // Convertir saltos de línea en <br>
+            message = message.replace(/\n/g, '<br>');
+            
+            // Convertir emojis de texto en Unicode
+            message = message.replace(/:\)/g, '😊');
+            message = message.replace(/:\(/g, '😔');
+            message = message.replace(/:D/g, '😃');
+            
+            return message;
+        },
+        
+        // Hacer scroll al final
+        scrollToBottom() {
+            ChatUtils.scrollToBottom('chat-messages');
+        },
+        
+        // ========================================
+        // FUNCIONALIDADES DEL EDITOR RIVESCRIPT
+        // ========================================
+        
+        // Estado del editor RiveScript
+        showRiveScriptEditor: false,
+        availableFlows: [],
+        selectedFlowId: '',
+        currentFlow: null,
+        riveScriptContent: '',
+        testMessage: '',
+        testResult: null,
+        validationErrors: [],
+        validationTimeout: null,
+        
+        // Cargar flujos disponibles
+        async reloadFlows() {
+            try {
+                const response = await fetchAPI('/rivescript/flows');
+                if (response.status === 'success') {
+                    this.availableFlows = response.flows;
+                    ChatUtils.showToast('Flujos cargados', 'success');
+                }
+            } catch (error) {
+                console.error('Error cargando flujos:', error);
+                ChatUtils.showToast('Error cargando flujos', 'error');
+            }
+        },
+        
+        // Cargar flujo seleccionado
+        async loadSelectedFlow() {
+            if (!this.selectedFlowId) {
+                this.newFlow();
+                return;
+            }
+            
+            try {
+                const response = await fetchAPI(`/rivescript/flows/${this.selectedFlowId}`);
+                if (response.status === 'success') {
+                    this.currentFlow = response.flow;
+                    this.riveScriptContent = response.flow.rivescript_content || '';
+                    this.validationErrors = [];
+                    ChatUtils.showToast(`Flujo "${response.flow.name}" cargado`, 'success');
+                }
+            } catch (error) {
+                console.error('Error cargando flujo:', error);
+                ChatUtils.showToast('Error cargando flujo', 'error');
+            }
+        },
+        
+        // Crear nuevo flujo
+        newFlow() {
+            this.selectedFlowId = '';
+            this.currentFlow = {
+                id: null,
+                name: 'Nuevo Flujo',
+                category: 'general',
+                is_active: true,
+                rivescript_content: ''
+            };
+            this.riveScriptContent = `// Nuevo flujo RiveScript
+// Nombre: ${this.currentFlow.name}
+// Categoría: ${this.currentFlow.category}
+//
+// Ejemplo de patrones básicos:
+
++ hola
+- ¡Hola! ¿En qué puedo ayudarte?
+
++ [*] ayuda [*]
+- Estoy aquí para ayudarte. ¿Qué necesitas?
+
++ [*] soporte [*]
+- Te dirijo al área de soporte. ¿Cuál es tu consulta?
+
++ adios
+- ¡Hasta luego! Que tengas un buen día.
+`;
+            this.validationErrors = [];
+            this.testResult = null;
+        },
+        
+        // Guardar RiveScript
+        async saveRiveScript() {
+            if (!this.riveScriptContent.trim()) {
+                ChatUtils.showToast('El contenido no puede estar vacío', 'error');
+                return;
+            }
+            
+            // Validar antes de guardar
+            if (!this.validateRiveScriptSyntax()) {
+                ChatUtils.showToast('Hay errores de sintaxis. Corrige antes de guardar', 'error');
+                return;
+            }
+            
+            try {
+                const flowData = {
+                    name: this.currentFlow?.name || 'Flujo sin nombre',
+                    category: this.currentFlow?.category || 'general',
+                    rivescript_content: this.riveScriptContent,
+                    is_active: this.currentFlow?.is_active ?? true
+                };
+                
+                const url = this.currentFlow?.id 
+                    ? `/rivescript/flows/${this.currentFlow.id}` 
+                    : '/rivescript/flows';
+                
+                const method = this.currentFlow?.id ? 'PUT' : 'POST';
+                
+                const response = await fetchAPI(url, {
+                    method: method,
+                    body: JSON.stringify(flowData)
+                });
+                
+                if (response.status === 'success') {
+                    this.currentFlow = response.flow;
+                    this.selectedFlowId = response.flow.id;
+                    await this.reloadFlows();
+                    ChatUtils.showToast('Flujo guardado correctamente', 'success');
+                } else {
+                    throw new Error(response.message || 'Error guardando flujo');
+                }
+            } catch (error) {
+                console.error('Error guardando RiveScript:', error);
+                ChatUtils.showToast('Error guardando flujo', 'error');
+            }
+        },
+        
+        // Probar RiveScript
+        async testRiveScript() {
+            if (!this.testMessage.trim()) {
+                ChatUtils.showToast('Ingresa un mensaje de prueba', 'warning');
+                return;
+            }
+            
+            try {
+                const response = await fetchAPI('/rivescript/test', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        rivescript_content: this.riveScriptContent,
+                        message: this.testMessage,
+                        phone_number: 'test_user'
+                    })
+                });
+                
+                if (response.status === 'success') {
+                    this.testResult = {
+                        input: this.testMessage,
+                        output: response.response.response,
+                        type: response.response.type,
+                        confidence: response.response.confidence_score
+                    };
+                    ChatUtils.showToast('Prueba ejecutada', 'success');
+                } else {
+                    this.testResult = {
+                        input: this.testMessage,
+                        output: 'Error en la prueba: ' + (response.message || 'Error desconocido'),
+                        type: 'error',
+                        confidence: 0
+                    };
+                }
+                
+                this.testMessage = '';
+            } catch (error) {
+                console.error('Error probando RiveScript:', error);
+                this.testResult = {
+                    input: this.testMessage,
+                    output: 'Error de conexión: ' + error.message,
+                    type: 'error',
+                    confidence: 0
+                };
+            }
+        },
+        
+        // Probar mensaje en flujo actual
+        async testFlowMessage() {
+            if (!this.testMessage.trim()) return;
+            
+            try {
+                const response = await fetchAPI('/rivescript/test-flow', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        flow_id: this.currentFlow?.id,
+                        message: this.testMessage,
+                        phone_number: 'test_user'
+                    })
+                });
+                
+                if (response.status === 'success') {
+                    this.testResult = {
+                        input: this.testMessage,
+                        output: response.response.response,
+                        type: response.response.type,
+                        confidence: response.response.confidence_score || 0
+                    };
+                } else {
+                    this.testResult = {
+                        input: this.testMessage,
+                        output: response.message || 'Sin respuesta',
+                        type: 'no_match',
+                        confidence: 0
+                    };
+                }
+                
+                this.testMessage = '';
+            } catch (error) {
+                console.error('Error probando mensaje:', error);
+                this.testResult = {
+                    input: this.testMessage,
+                    output: 'Error: ' + error.message,
+                    type: 'error',
+                    confidence: 0
+                };
+            }
+        },
+        
+        // Recargar flujos del chatbot
+        async reloadChatbotFlows() {
+            try {
+                const response = await fetchAPI('/rivescript/reload', {
+                    method: 'POST'
+                });
+                
+                if (response.status === 'success') {
+                    ChatUtils.showToast('Flujos del chatbot recargados', 'success');
+                } else {
+                    throw new Error(response.message || 'Error recargando flujos');
+                }
+            } catch (error) {
+                console.error('Error recargando flujos:', error);
+                ChatUtils.showToast('Error recargando flujos del chatbot', 'error');
+            }
+        },
+        
+        // Validar sintaxis RiveScript
+        validateRiveScriptSyntax() {
+            this.validationErrors = [];
+            const lines = this.riveScriptContent.split('\n');
+            let isValid = true;
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (line === '' || line.startsWith('//')) continue;
+                
+                // Validaciones básicas de sintaxis RiveScript
+                if (line.startsWith('+') || line.startsWith('-') || line.startsWith('*') || line.startsWith('>')) {
+                    // Línea válida de RiveScript
+                    continue;
+                } else if (line.includes('+') || line.includes('-')) {
+                    // Posible error de sintaxis
+                    this.validationErrors.push(`Línea ${i + 1}: Posible error de sintaxis - "${line}"`);
+                    isValid = false;
+                }
+            }
+            
+            // Validar estructura básica
+            const triggers = this.riveScriptContent.match(/^\+ /gm);
+            const responses = this.riveScriptContent.match(/^- /gm);
+            
+            if (triggers && responses && triggers.length !== responses.length) {
+                this.validationErrors.push('Número de triggers (+) no coincide con respuestas (-)');
+                isValid = false;
+            }
+            
+            return isValid;
+        },
+        
+        // Validación con debounce
+        debouncedValidation() {
+            clearTimeout(this.validationTimeout);
+            this.validationTimeout = setTimeout(() => {
+                this.validateRiveScriptSyntax();
+            }, 500);
+        },
+        
+        // Formatear RiveScript
+        formatRiveScript() {
+            if (!this.riveScriptContent.trim()) return;
+            
+            const lines = this.riveScriptContent.split('\n');
+            const formattedLines = [];
+            
+            for (let line of lines) {
+                // Mantener comentarios como están
+                if (line.trim().startsWith('//') || line.trim() === '') {
+                    formattedLines.push(line);
+                    continue;
+                }
+                
+                // Formatear triggers
+                if (line.trim().startsWith('+')) {
+                    formattedLines.push('+ ' + line.trim().substring(1).trim());
+                }
+                // Formatear respuestas
+                else if (line.trim().startsWith('-')) {
+                    formattedLines.push('- ' + line.trim().substring(1).trim());
+                }
+                // Formatear continuaciones
+                else if (line.trim().startsWith('^')) {
+                    formattedLines.push('^ ' + line.trim().substring(1).trim());
+                }
+                // Formatear topics
+                else if (line.trim().startsWith('>')) {
+                    formattedLines.push('> ' + line.trim().substring(1).trim());
+                }
+                else {
+                    formattedLines.push(line);
+                }
+            }
+            
+            this.riveScriptContent = formattedLines.join('\n');
+            ChatUtils.showToast('RiveScript formateado', 'success');
+        },
+        
+        // Validar RiveScript
+        validateRiveScript() {
+            const isValid = this.validateRiveScriptSyntax();
+            if (isValid) {
+                ChatUtils.showToast('Sintaxis válida', 'success');
+            } else {
+                ChatUtils.showToast('Errores de sintaxis encontrados', 'error');
+            }
+        },
+        
+        // Cargar y mostrar flujos activos
+        async loadActiveFlows() {
+            try {
+                const response = await fetchAPI('/rivescript/flows');
+                
+                const container = document.getElementById('active-flows-list');
+                
+                if (response.status === 'success' && response.flows) {
+                    const activeFlows = response.flows.filter(f => f.is_active);
+                    const inactiveFlows = response.flows.filter(f => !f.is_active);
+                    
+                    let html = `
+                        <div class="bg-white p-3 rounded-md border mb-3">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-green-600 font-medium">✅ Activos: ${activeFlows.length}</span>
+                                <span class="text-gray-500">⏸️ Inactivos: ${inactiveFlows.length}</span>
+                                <span class="text-blue-600 font-medium">📋 Total: ${response.total}</span>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                    `;
+                    
+                    // Mostrar flujos activos primero
+                    [...activeFlows, ...inactiveFlows].forEach(flow => {
+                        const statusClass = flow.is_active ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200';
+                        const statusIcon = flow.is_active ? '✅' : '⏸️';
+                        const defaultBadge = flow.is_default ? '<span class="px-2 py-1 bg-yellow-200 text-yellow-800 text-xs rounded-full">DEFAULT</span>' : '';
+                        
+                        html += `
+                            <div class="p-3 rounded-md border ${statusClass}">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1">
+                                        <div class="font-medium text-gray-900">
+                                            ${statusIcon} ${flow.name}
+                                        </div>
+                                        <div class="text-sm text-gray-600 mt-1">
+                                            ${flow.description || 'Sin descripción'}
+                                        </div>
+                                        <div class="flex items-center mt-2 space-x-2">
+                                            ${defaultBadge}
+                                            <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">P${flow.priority}</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex space-x-1">
+                                        <button class="px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded hover:bg-purple-200" 
+                                                onclick="loadFlowInEditor('${flow.id}')">
+                                            📝 Editar
+                                        </button>
+                                        <button class="px-2 py-1 ${flow.is_active ? 'bg-red-100 text-red-800 hover:bg-red-200' : 'bg-green-100 text-green-800 hover:bg-green-200'} text-xs rounded" 
+                                                onclick="toggleFlowStatus('${flow.id}', ${flow.is_active})">
+                                            ${flow.is_active ? '⏸️ Desactivar' : '▶️ Activar'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    container.innerHTML = html;
+                    
+                } else {
+                    container.innerHTML = '<div class="text-yellow-600 p-3 bg-yellow-50 rounded-md">No se pudieron cargar los flujos</div>';
+                }
+                
+            } catch (error) {
+                console.error('Error cargando flujos activos:', error);
+                document.getElementById('active-flows-list').innerHTML = 
+                    '<div class="text-red-600 p-3 bg-red-50 rounded-md">Error cargando flujos: ' + error.message + '</div>';
+            }
+        }
+    }
+}
+
+/**
+ * Cargar un flujo específico en el editor
+ */
+async function loadFlowInEditor(flowId) {
+    try {
+        const response = await fetchAPI(`/rivescript/flows/${flowId}`);
+        
+        if (response.status === 'success') {
+            const flow = response.flow;
+            
+            // Obtener la instancia de Alpine.js
+            const chatAppInstance = Alpine.$data(document.querySelector('[x-data="chatApp()"]'));
+            
+            // Cargar contenido en el editor
+            chatAppInstance.riveScriptContent = flow.rivescript_content || '';
+            chatAppInstance.currentFlow = {
+                id: flow.id,
+                name: flow.name,
+                description: flow.description || '',
+                category: 'loaded',
+                is_active: flow.is_active,
+                priority: flow.priority || 1
+            };
+            
+            ChatUtils.showToast(`Flujo "${flow.name}" cargado en el editor`, 'success');
+            
+        } else {
+            ChatUtils.showToast('Error cargando flujo: ' + response.message, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        ChatUtils.showToast('Error cargando flujo: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Alternar estado activo/inactivo de un flujo
+ */
+async function toggleFlowStatus(flowId, currentStatus) {
+    try {
+        const newStatus = !currentStatus;
+        const action = newStatus ? 'activar' : 'desactivar';
+        
+        if (!confirm(`¿Estás seguro de que quieres ${action} este flujo?`)) {
+            return;
+        }
+        
+        const response = await fetchAPI(`/rivescript/flows/${flowId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                is_active: newStatus
+            })
+        });
+        
+        if (response.status === 'success') {
+            ChatUtils.showToast(`Flujo ${action} exitosamente`, 'success');
+            
+            // Recargar flujos en el chatbot
+            await fetchAPI('/rivescript/reload', { method: 'POST' });
+            
+            // Actualizar lista de flujos
+            const chatAppInstance = Alpine.$data(document.querySelector('[x-data="chatApp()"]'));
+            await chatAppInstance.loadActiveFlows();
+            
+        } else {
+            ChatUtils.showToast('Error: ' + response.message, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        ChatUtils.showToast('Error cambiando estado: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Cargar un flujo específico en el editor
+ */
+async function loadFlowInEditor(flowId) {
+    try {
+        const response = await fetch(`/rivescript/flows/${flowId}`);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            const flow = data.flow;
+            
+            // Cargar contenido en el editor
+            document.getElementById('rivescript-content').value = flow.rivescript_content || '';
+            document.getElementById('flow-name').value = flow.name;
+            document.getElementById('flow-description').value = flow.description || '';
+            document.getElementById('is-active').checked = flow.is_active;
+            document.getElementById('priority').value = flow.priority || 1;
+            
+            // Guardar ID para futuras actualizaciones
+            currentFlowId = flowId;
+            
+            // Actualizar botón de guardar
+            const saveBtn = document.getElementById('save-flow');
+            saveBtn.textContent = '📝 Actualizar Flujo';
+            saveBtn.className = 'btn btn-warning';
+            
+            showNotification(`Flujo "${flow.name}" cargado en el editor`, 'success');
+            
+        } else {
+            showNotification('Error cargando flujo: ' + data.message, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error cargando flujo: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Alternar estado activo/inactivo de un flujo
+ */
+async function toggleFlowStatus(flowId, currentStatus) {
+    try {
+        const newStatus = !currentStatus;
+        const action = newStatus ? 'activar' : 'desactivar';
+        
+        if (!confirm(`¿Estás seguro de que quieres ${action} este flujo?`)) {
+            return;
+        }
+        
+        const response = await fetch(`/rivescript/flows/${flowId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                is_active: newStatus
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showNotification(`Flujo ${action} exitosamente`, 'success');
+            
+            // Recargar flujos en el chatbot
+            await fetch('/rivescript/reload', { method: 'POST' });
+            
+            // Actualizar lista de flujos
+            await loadActiveFlows();
+            
+        } else {
+            showNotification('Error: ' + data.message, 'error');
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error cambiando estado: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Cargar y mostrar flujos activos - Función global
+ */
+async function loadActiveFlows() {
+    try {
+        console.log('Cargando flujos activos...');
+        
+        const response = await fetch('/rivescript/flows', {
+            headers: {
+                'X-API-Key': 'dev-api-key'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.flows) {
+            const container = document.getElementById('active-flows-list');
+            if (!container) {
+                console.warn('Contenedor active-flows-list no encontrado');
+                return;
+            }
+            
+            const activeFlows = data.flows.filter(f => f.is_active);
+            const inactiveFlows = data.flows.filter(f => !f.is_active);
+            
+            let html = `
+                <div class="flows-summary mb-3 p-2 bg-light rounded">
+                    <strong>✅ Activos: ${activeFlows.length}</strong> | 
+                    <strong>⏸️ Inactivos: ${inactiveFlows.length}</strong> | 
+                    <strong>📋 Total: ${data.total}</strong>
+                </div>
+                <div class="flows-list">
+            `;
+            
+            // Mostrar flujos activos primero, luego inactivos
+            [...activeFlows, ...inactiveFlows].forEach(flow => {
+                const statusClass = flow.is_active ? 'active' : 'inactive';
+                const statusIcon = flow.is_active ? '✅' : '⏸️';
+                const defaultBadge = flow.is_default ? '<span class="badge bg-primary ms-1">DEFAULT</span>' : '';
+                
+                html += `
+                    <div class="flow-status border rounded p-2 mb-2 ${statusClass}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flow-info">
+                                <strong>${statusIcon} ${flow.name}</strong>
+                                ${defaultBadge}
+                                <div class="flow-details text-muted small">
+                                    ${flow.description || 'Sin descripción'}
+                                </div>
+                            </div>
+                            <div class="flow-actions">
+                                <span class="badge bg-secondary me-2">P${flow.priority}</span>
+                                <button class="btn btn-sm btn-outline-primary me-1" 
+                                        onclick="loadFlowInEditor('${flow.id}')"
+                                        title="Editar flujo">
+                                    📝
+                                </button>
+                                <button class="btn btn-sm ${flow.is_active ? 'btn-outline-danger' : 'btn-outline-success'}" 
+                                        onclick="toggleFlowStatus('${flow.id}', ${flow.is_active})"
+                                        title="${flow.is_active ? 'Desactivar' : 'Activar'} flujo">
+                                    ${flow.is_active ? '⏸️' : '▶️'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+            
+            console.log(`Flujos cargados: ${activeFlows.length} activos, ${inactiveFlows.length} inactivos`);
+            
+        } else {
+            document.getElementById('active-flows-list').innerHTML = 
+                '<div class="alert alert-warning">No se pudieron cargar los flujos</div>';
+        }
+        
+    } catch (error) {
+        console.error('Error cargando flujos activos:', error);
+        const container = document.getElementById('active-flows-list');
+        if (container) {
+            container.innerHTML = 
+                `<div class="alert alert-danger">Error cargando flujos: ${error.message}</div>`;
+        }
+    }
+}
+
+/**
+ * Cargar un flujo específico en el editor - Función global
+ */
+async function loadFlowInEditor(flowId) {
+    try {
+        console.log('Cargando flujo en editor:', flowId);
+        
+        const response = await fetch(`/rivescript/flows/${flowId}`, {
+            headers: {
+                'X-API-Key': 'dev-api-key'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.flow) {
+            const flow = data.flow;
+            
+            // Usar Alpine.js para cargar el flujo en el editor
+            const chatApp = Alpine.$data(document.querySelector('[x-data="chatApp()"]'));
+            if (chatApp && chatApp.loadFlowInEditor) {
+                await chatApp.loadFlowInEditor(flowId);
+                
+                // Mostrar el panel del editor
+                chatApp.showEditor = true;
+                
+                console.log('Flujo cargado en editor exitosamente');
+                showNotification(`Flujo "${flow.name}" cargado en el editor`, 'success');
+            } else {
+                console.error('No se pudo acceder a la instancia de Alpine.js');
+                showNotification('Error accediendo al editor', 'error');
+            }
+        } else {
+            throw new Error(data.message || 'Error cargando flujo');
+        }
+        
+    } catch (error) {
+        console.error('Error cargando flujo en editor:', error);
+        showNotification('Error cargando flujo: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Cambiar estado activo/inactivo de un flujo - Función global
+ */
+async function toggleFlowStatus(flowId, currentStatus) {
+    try {
+        console.log('Cambiando estado del flujo:', flowId, 'desde:', currentStatus);
+        
+        const newStatus = !currentStatus;
+        
+        const response = await fetch(`/rivescript/flows/${flowId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': 'dev-api-key'
+            },
+            body: JSON.stringify({
+                is_active: newStatus
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            // Recargar flujos activos para reflejar el cambio
+            await loadActiveFlows();
+            
+            const statusText = newStatus ? 'activado' : 'desactivado';
+            console.log(`Flujo ${statusText} exitosamente`);
+            showNotification(`Flujo ${statusText} exitosamente`, 'success');
+            
+            // Si tenemos Alpine.js disponible, también recargar ahí
+            const chatApp = Alpine.$data(document.querySelector('[x-data="chatApp()"]'));
+            if (chatApp && chatApp.loadActiveFlows) {
+                await chatApp.loadActiveFlows();
+            }
+        } else {
+            throw new Error(data.message || 'Error cambiando estado');
+        }
+        
+    } catch (error) {
+        console.error('Error cambiando estado del flujo:', error);
+        showNotification('Error cambiando estado: ' + error.message, 'error');
+    }
+}
+
+/**
+ * Mostrar notificaciones - Función global
+ */
+function showNotification(message, type = 'info') {
+    console.log(`[${type.toUpperCase()}] ${message}`);
+    
+    // Crear elemento de notificación temporal
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info'} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove después de 3 segundos
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
+
+// Variable global para tracking de flujo actual
+let currentFlowId = null;
+
+// Event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Cargar flujos activos al inicio
+    loadActiveFlows();
+    
+    // Botón de actualizar flujos
+    document.getElementById('refresh-flows').addEventListener('click', loadActiveFlows);
+});
+</script>
+{% endblock %}

@@ -27,11 +27,17 @@ def init_database(app):
     if app.config.get('DEBUG'):
         logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
     
-    # Crear tablas si no existen (solo en desarrollo con SQLite)
-    if app.config.get('DEBUG') and 'sqlite' in app.config.get('SQLALCHEMY_DATABASE_URI', ''):
-        with app.app_context():
-            db.create_all()
-            logging.info("Tablas de base de datos creadas/verificadas")
+    # Crear tablas si no existen 
+    # Para PostgreSQL, las tablas ya están creadas con el script SQL
+    # Para SQLite (testing), crear automáticamente
+    if app.config.get('DEBUG'):
+        database_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        if 'sqlite' in database_uri:
+            with app.app_context():
+                db.create_all()
+                logging.info("Tablas SQLite creadas/verificadas")
+        elif 'postgresql' in database_uri:
+            logging.info("Usando PostgreSQL - tablas ya creadas con script SQL")
 
 def get_db_session():
     """
@@ -75,7 +81,9 @@ def safe_commit(session):
         return True
     except Exception as e:
         session.rollback()
-        logging.error(f"Error en commit de base de datos: {e}")
+        # Convertir el error a string seguro para logging
+        error_msg = str(e).encode('utf-8', errors='replace').decode('utf-8')
+        logging.error(f"Error en commit de base de datos: {error_msg}")
         return False
 
 def safe_rollback(session):

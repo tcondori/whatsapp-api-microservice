@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-gray-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Simulador WhatsApp Chat{% endblock %}</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        whatsapp: {
+                            50: '#f0f9f0',
+                            100: '#dcf2dc', 
+                            500: '#25d366',
+                            600: '#128c7e',
+                            700: '#075e54',
+                            900: '#1f2937'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- CSS personalizado -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/rivescript-editor.css') }}">
+    
+    <!-- Iconos (Heroicons) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@heroicons/react@2.0.18/24/outline/style.css">
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Estilos personalizados para el chat */
+        .chat-container {
+            background: linear-gradient(180deg, #075e54 0%, #128c7e 100%);
+        }
+        
+        .message-bubble-user {
+            background: #dcf8c6;
+            color: #303030;
+        }
+        
+        .message-bubble-bot {
+            background: white;
+            color: #303030;
+        }
+        
+        .message-bubble-system {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .scroll-smooth {
+            scroll-behavior: smooth;
+        }
+        
+        /* Animaciones */
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: #999;
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+        
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-10px); }
+        }
+    </style>
+    
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full">
+    <!-- Contenido principal -->
+    <main class="h-full">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- Scripts globales -->
+    <script>
+        // Utilidades globales para el chat
+        window.ChatUtils = {
+            // Formatear timestamp para mostrar
+            formatTime: function(timestamp) {
+                const date = new Date(timestamp);
+                return date.toLocaleTimeString('es-ES', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            },
+            
+            // Hacer scroll al final del chat
+            scrollToBottom: function(containerId = 'chat-messages', smooth = true) {
+                const container = document.getElementById(containerId);
+                if (container) {
+                    const scrollOptions = { top: container.scrollHeight };
+                    if (smooth) scrollOptions.behavior = 'smooth';
+                    container.scrollTo(scrollOptions);
+                }
+            },
+            
+            // Mostrar notificación toast
+            showToast: function(message, type = 'info') {
+                // Implementación simple de toast
+                const toast = document.createElement('div');
+                toast.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+                    type === 'error' ? 'bg-red-500 text-white' :
+                    type === 'success' ? 'bg-green-500 text-white' :
+                    'bg-blue-500 text-white'
+                }`;
+                toast.textContent = message;
+                document.body.appendChild(toast);
+                
+                setTimeout(() => {
+                    toast.remove();
+                }, 3000);
+            },
+            
+            // Copiar texto al portapapeles
+            copyToClipboard: function(text) {
+                navigator.clipboard.writeText(text).then(() => {
+                    this.showToast('Copiado al portapapeles', 'success');
+                }).catch(() => {
+                    this.showToast('Error al copiar', 'error');
+                });
+            }
+        };
+        
+        // Configuración global de fetch para incluir headers
+        window.fetchAPI = function(url, options = {}) {
+            const defaultOptions = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            };
+            
+            return fetch(url, { ...defaultOptions, ...options })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                });
+        };
+    </script>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
